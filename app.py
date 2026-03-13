@@ -23,25 +23,46 @@ if api_key:
 else:
     st.error("❌ 缺少 GEMINI_API_KEY。请在 Advanced settings -> Secrets 中配置。")
 
-# 智能模型选择逻辑：优先 Pro 处理复杂写作，Flash 处理简单调研
+# ==========================================
+# 强制兼容版模型加载逻辑
+# ==========================================
 def load_model(model_type="pro"):
-    # 尝试常见的模型名称字符串
-    pro_names = ["gemini-1.5-pro", "models/gemini-1.5-pro", "gemini-1.5-pro-latest"]
-    flash_names = ["gemini-1.5-flash", "models/gemini-1.5-flash", "gemini-1.5-flash-latest"]
+    # 尝试所有可能的模型名称变体
+    if model_type == "pro":
+        candidates = [
+            'models/gemini-1.5-pro', 
+            'gemini-1.5-pro', 
+            'models/gemini-1.5-pro-latest',
+            'models/gemini-2.0-pro-exp' # 2026年备选
+        ]
+    else:
+        candidates = [
+            'models/gemini-1.5-flash', 
+            'gemini-1.5-flash', 
+            'models/gemini-1.5-flash-latest',
+            'models/gemini-1.5-flash-8b'
+        ]
     
-    target_names = pro_names if model_type == "pro" else flash_names
-    
-    # 自动获取可用列表并匹配
+    # 挨个尝试，哪个不报错就用哪个
+    for name in candidates:
+        try:
+            m = genai.GenerativeModel(name)
+            # 测试一下是否真的能用
+            m.generate_content("test", generation_config={"max_output_tokens": 1})
+            return m
+        except:
+            continue
+            
+    # 如果全部失败，尝试动态获取列表
     try:
         available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        for name in target_names:
-            full_name = f"models/{name}" if not name.startswith("models/") else name
-            if full_name in available or name in available:
-                return genai.GenerativeModel(name)
-        # 兜底
-        return genai.GenerativeModel("gemini-1.5-flash")
+        if available:
+            return genai.GenerativeModel(available[0])
     except:
-        return genai.GenerativeModel("gemini-1.5-flash")
+        pass
+        
+    # 最后的倔强：直接返回最基础的 ID
+    return genai.GenerativeModel('models/gemini-1.5-flash')
 
 # 初始化状态
 for key in ['topics', 'selected_topic', 'insights', 'article_draft']:
