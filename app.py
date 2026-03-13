@@ -57,6 +57,14 @@ if st.button("🚀 生成 100 个博客话题", type="primary"):
             except Exception as e:
                 st.error(f"生成失败: {e}")
 
+# 在 st.title 之后加入这段代码用于诊断
+if st.checkbox("查看我可用的模型列表"):
+    try:
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        st.write(models)
+    except Exception as e:
+        st.error(f"无法获取模型列表: {e}")
+
 if st.session_state.topics:
     st.subheader("2. 选择话题并进行深度调研")
     selected = st.selectbox("请选择一个进行下一步：", st.session_state.topics)
