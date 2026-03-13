@@ -41,6 +41,185 @@ state_keys = ['persona_cn', 'persona_en', 'raw_topics', 'clean_topics', 'materia
 for k in state_keys:
     if k not in st.session_state: st.session_state[k] = "" if k in ['persona_cn', 'persona_en', 'article_draft'] else []
 
+
+import streamlit as st
+import google.generativeai as genai
+import os
+
+# ==========================================
+# 0. 页面配置与大模型初始化
+# ==========================================
+st.set_page_config(page_title="AI Writer - 工具 1：角色背景", layout="wide")
+
+# 获取 API Key (优先从 Secrets 获取，其次从本地环境变量获取)
+api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    st.error("❌ 未检测到 GEMINI_API_KEY。请在环境或 Secrets 中配置。")
+    st.stop()
+
+# 智能获取可用的最快模型 (用于翻译和润色)
+@st.cache_resource
+def get_flash_model():
+    try:
+        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        target = next((m for m in available if "flash" in m), available[0])
+        return genai.GenerativeModel(target)
+    except:
+        return genai.GenerativeModel('models/gemini-1.5-flash')
+
+model = get_flash_model()
+
+# ==========================================
+# 1. 定义 20 个标准化的业务问题 (融合了你的 B2B 样本)
+# ==========================================
+QUESTIONS = [
+    {"title": "基本信息", "q": "您的姓名和职位？", "example": "Alan Kong，销售总监"},
+    {"title": "基本信息", "q": "您的公司名称（或品牌名称）是什么？", "example": "ABC 制造"},
+    {"title": "基本信息", "q": "您的公司官方网站和联系邮箱是什么？", "example": "www.abc.com, alan@abc.com"},
+    {"title": "业务运营", "q": "您的公司总部在哪里？是否有海外分支机构或生产基地？", "example": "总部在新加坡，在中国和越南有分公司"},
+    {"title": "业务运营", "q": "您主要销售的核心产品或服务是什么？", "example": "定制机械零件"},
+    {"title": "产品特征", "q": "您的产品有哪些独特的生产特点或技术门槛？", "example": "需根据图纸开模定制、在越南本地生产避开高关税"},
+    {"title": "商业模式", "q": "您的核心商业模式是什么？", "example": "B2B 国际出口贸易，仅限大宗批发"},
+    {"title": "商业模式", "q": "除了产品本身，您还为客户提供哪些增值服务？", "example": "寻源采购、验厂、质量检测、门到门物流管理"},
+    {"title": "市场营销", "q": "您的主要出口/销售目标国家或地区是哪里？", "example": "美国、加拿大"},
+    {"title": "市场营销", "q": "您目前主要通过哪些营销渠道获取客户？", "example": "公司官网 SEO、阿里巴巴、LinkedIn"},
+    {"title": "目标客户", "q": "您的典型客户在企业中通常担任什么职位？", "example": "采购经理、产品总监或 CEO"},
+    {"title": "目标客户", "q": "您的客户所在企业属于什么规模和类型？", "example": "北美中等规模的进口批发商或中型制造商"},
+    {"title": "客户画像", "q": "您的典型客户的大致年龄段和性格特征是什么？", "example": "50岁左右，行业知识丰富，自信，习惯主导对话"},
+    {"title": "客户画像", "q": "您的客户在沟通上有何偏好？", "example": "喜欢简短直接的邮件，讨厌挤牙膏式回复，要求极度专业"},
+    {"title": "客户痛点", "q": "客户目前的盈利模式（赚钱方式）是什么？", "example": "低成本进口定制零件，然后高价转售给美国本土制造商"},
+    {"title": "客户痛点", "q": "在选择供应商时，客户最看重哪些核心能力？", "example": "工程设计能力、项目进度管理能力和质量控制能力"},
+    {"title": "客户偏好", "q": "客户受宏观环境影响，在采购地区上有何偏好？", "example": "为规避中美关税，更倾向于从东南亚国家采购"},
+    {"title": "客户偏好", "q": "客户在采购流程和商务条件上有什么特殊要求？", "example": "要求提供门到门的物流解决方案，以及支持赊销"},
+    {"title": "客户行为", "q": "客户目前习惯通过什么方式寻找新供应商？", "example": "Google 搜索、阿里巴巴展会"},
+    {"title": "核心痛点", "q": "客户在采购过程中遇到的最大、最痛的 3 个问题是什么？", "example": "1. 销售不懂技术；2. 交期延误导致赔钱；3. 品控差导致尺寸不达标"}
+]
+
+# ==========================================
+# 2. 状态管理 (记录进度和答案，实现“不怕中途退出” )
+# ==========================================
+if 'current_step' not in st.session_state:
+    st.session_state.current_step = 0
+if 'answers' not in st.session_state:
+    st.session_state.answers = [""] * len(QUESTIONS)
+if 'persona_cn' not in st.session_state:
+    st.session_state.persona_cn = ""
+if 'persona_en' not in st.session_state:
+    st.session_state.persona_en = ""
+
+# ==========================================
+# 3. UI 界面构建
+# ==========================================
+st.title("👤 工具 1：创建【我的角色背景】")
+st.markdown("通过逐步问答，完整描述您的业务和目标客户。这份背景将作为所有自动化写作工具的“灵魂” [cite: 16]。")
+
+# 进度条
+progress = st.session_state.current_step / len(QUESTIONS)
+st.progress(progress, text=f"当前进度: {st.session_state.current_step} / {len(QUESTIONS)}")
+
+# --- 问答环节 ---
+if st.session_state.current_step < len(QUESTIONS):
+    q_data = QUESTIONS[st.session_state.current_step]
+    
+    st.subheader(f"Step {st.session_state.current_step + 1}: {q_data['title']}")
+    st.markdown(f"### **{q_data['q']}**")
+    st.info(f"💡 **参考示例：** {q_data['example']}")
+    
+    # 输入框 (绑定 session_state 中的答案)
+    current_answer = st.text_area(
+        "您的回答（支持随时修改）：", 
+        value=st.session_state.answers[st.session_state.current_step],
+        height=150,
+        key=f"input_{st.session_state.current_step}"
+    )
+    
+    # 底部导航按钮 (模拟文档的“下一步”、“上一步” [cite: 620-621])
+    col1, col2, col3 = st.columns([1, 1, 2])
+    with col1:
+        if st.button("⬅️ 上一步", disabled=(st.session_state.current_step == 0)):
+            st.session_state.answers[st.session_state.current_step] = current_answer
+            st.session_state.current_step -= 1
+            st.rerun()
+    with col2:
+        if st.button("下一步 ➡️", type="primary"):
+            st.session_state.answers[st.session_state.current_step] = current_answer
+            st.session_state.current_step += 1
+            st.rerun()
+
+# --- 汇总与生成环节 (对应文档中的“汇总校对 → 一键翻译为英文” [cite: 20]) ---
+else:
+    st.success("🎉 所有问题已填写完毕！请检查您的业务背景汇总：")
+    
+    # 将 20 个答案拼接成你提供的那个优秀的 Prompt 模板格式
+    draft_cn = f"""
+    ## 我的角色：
+    ### 关于我的业务
+    姓名/职位：{st.session_state.answers[0]}
+    品牌名称：{st.session_state.answers[1]}
+    网站/邮箱：{st.session_state.answers[2]}
+    当前运营：{st.session_state.answers[3]}
+    核心产品：{st.session_state.answers[4]}
+    产品特点：{st.session_state.answers[5]}
+    商业模式：{st.session_state.answers[6]}
+    我们的服务：{st.session_state.answers[7]}
+    主要出口国家：{st.session_state.answers[8]}
+    营销渠道：{st.session_state.answers[9]}
+
+    ### 关于我的典型客户
+    职位：{st.session_state.answers[10]}
+    企业规模与类型：{st.session_state.answers[11]}
+    年龄与性格特点：{st.session_state.answers[12]}
+    沟通偏好：{st.session_state.answers[13]}
+    盈利模式：{st.session_state.answers[14]}
+    采购偏好/看重能力：{st.session_state.answers[15]}
+    采购地区偏好：{st.session_state.answers[16]}
+    采购要求/商务条件：{st.session_state.answers[17]}
+    供应商寻找方式：{st.session_state.answers[18]}
+    核心痛点：
+    {st.session_state.answers[19]}
+    """
+    
+    # 允许用户最后微调中文草稿
+    st.session_state.persona_cn = st.text_area("您可以直接在此修改最终的中文草稿：", value=draft_cn.strip(), height=400)
+    
+    # 核心动作：一键翻译并保存
+    if st.button("✨ 一键翻译并保存为英文角色指令 (System Prompt)", type="primary"):
+        with st.spinner("AI 正在将您的业务背景转化为极其专业的英文 System Prompt..."):
+            translate_prompt = f"""
+            你是一位资深的 B2B 外贸营销专家。请将以下中文的客户业务背景，翻译并润色成一段极其地道、专业的英文。
+            这段英文将被用作后续 AI 自动写文章时的“System Prompt（系统指令）”，用来约束 AI 的写作口吻、背景设定和受众定位。
+            请确保语气专业，直接输出英文结果，不要包含任何多余的解释。
+            
+            原始中文背景：
+            {st.session_state.persona_cn}
+            """
+            try:
+                response = model.generate_content(translate_prompt)
+                st.session_state.persona_en = response.text
+                st.success("✅ 英文角色指令已生成并存入系统！它将在工具 4、5、6 中被自动调用 [cite: 624-625]。")
+            except Exception as e:
+                st.error(f"翻译失败: {e}")
+                
+    # 展示最终的英文版
+    if st.session_state.persona_en:
+        st.markdown("### 🏆 最终保存的英文角色指令 (供 AI 写作使用):")
+        st.code(st.session_state.persona_en, language="markdown")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("⬅️ 返回修改问题"):
+                st.session_state.current_step = 0
+                st.rerun()
+        with col2:
+            st.info("💡 下一步：您可以前往【工具 2：文章话题生成器】开始策划内容了。")
+
+
+
+
+
 # ==========================================
 # 工具 1：创建【我的角色背景】
 # ==========================================
