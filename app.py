@@ -45,10 +45,10 @@ if st.button("🚀 生成 100 个博客话题", type="primary"):
     if not business_bg:
         st.error("请先输入业务背景！")
     else:
-        with st.spinner("Gemini 3 Pro 正在为您策划话题..."):
+        with st.spinner("Gemini 1.5 正在为您策划话题..."):
             try:
-                # 修改点：使用 gemini-3-pro
-                model = genai.GenerativeModel('gemini-3-pro')
+                # 修改点：使用 gemini-1.5-pro
+                model = genai.GenerativeModel('gemini-1.5-pro')
                 prompt = f"基于以下背景，生成100个英文B2B博客标题，直接输出编号列表：{business_bg}"
                 response = model.generate_content(prompt)
                 raw_topics = response.text.strip().split('\n')
@@ -65,7 +65,7 @@ if st.session_state.topics:
         st.session_state.selected_topic = selected
         with st.spinner(f"Gemini 3 Pro 正在深度检索见解..."):
             try:
-                model = genai.GenerativeModel('gemini-3-pro')
+                model = genai.GenerativeModel('gemini-1.5-pro')
                 research_prompt = f"针对话题 '{selected}'，提取10条真实、专业的B2B行业见解（Insights）。要求：包含市场现状、技术标准或成本差异。以'见解 X:'开头。"
                 response = model.generate_content(research_prompt)
                 st.session_state.insights = [i.strip() for i in response.text.strip().split('\n') if i.strip()]
@@ -86,9 +86,9 @@ st.title("模块二：AI 深度文章生成 ✍️")
 
 if st.session_state.insights:
     if st.button("📝 生成 1500 字专业长文", type="primary"):
-        with st.spinner("Gemini 3 Pro 正在按照 SOP 撰写 1500 字长文..."):
+        with st.spinner("Gemini 1.5 Pro 正在按照 SOP 撰写 1500 字长文..."):
             try:
-                model = genai.GenerativeModel('gemini-3-pro')
+                model = genai.GenerativeModel('gemini-1.5-pro')
                 insights_text = "\n".join(st.session_state.insights)
                 generation_prompt = f"""
                 # Your Role: 资深外贸 B2B 代笔人。
@@ -122,9 +122,9 @@ if st.session_state.article_draft:
     
     with col1:
         if st.button("🖼️ 优化图片 SEO"):
-            with st.spinner("Gemini 3 Pro 正在注入 Alt 标签..."):
+            with st.spinner("Gemini 1.5 Pro 正在注入 Alt 标签..."):
                 try:
-                    model = genai.GenerativeModel('gemini-3-pro')
+                    model = genai.GenerativeModel('gemini-1.5-pro')
                     replace_prompt = f"请通读文章，将所有的 [Image X] 替换为标准的 Markdown 图片格式 ![Alt](Link 'Title')，Link 统一用 https://placehold.co/600x400.jpg。输出全文：\n{st.session_state.article_draft}"
                     st.session_state.article_draft = model.generate_content(replace_prompt).text
                     st.success("✅ SEO 标签已注入！")
@@ -134,7 +134,7 @@ if st.session_state.article_draft:
         if st.button("🔗 注入权威脚注"):
             with st.spinner("正在检索权威来源..."):
                 try:
-                    model = genai.GenerativeModel('gemini-3-pro')
+                    model = genai.GenerativeModel('gemini-1.5-pro')
                     footnote_prompt = f"为话题 '{st.session_state.selected_topic}' 生成 10 个 Markdown 格式的权威脚注引用列表。"
                     st.session_state.article_draft += "\n\n---\n### References\n" + model.generate_content(footnote_prompt).text
                     st.success("✅ 脚注已追加！")
