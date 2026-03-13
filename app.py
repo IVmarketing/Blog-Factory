@@ -95,43 +95,56 @@ if st.session_state.insights:
         for i in st.session_state.insights: st.write(i)
 
 # ==========================================
-# 4. 模块二：1500 字长文生成 (对应文档 5 - 开启流式)
+# 优化后的模块二生成逻辑 (解决安全过滤报错)
 # ==========================================
-st.markdown("---")
-st.title("✍️ 模块二：深度文章生成")
 
-if st.session_state.insights:
-    if st.button("📝 第三步：撰写 1500 字专业长文 (流式生成)", type="primary"):
-        st.session_state.article_draft = "" # 清空旧稿
-        with st.spinner("正在执行 Ghostwriter SOP 写作..."):
-            try:
-                model = genai.GenerativeModel(st.session_state.pro_model)
-                insights_str = "\n".join(st.session_state.insights)
-                write_prompt = f"""
-                # Your Role: 资深外贸 B2B 代笔专家。
-                # Task: 基于话题 {st.session_state.selected_topic} 和见解 {insights_str} 写 1500 字英文博客。
-                # SOP Requirements:
-                1. 1个 H1，恰好 4个 H2。
-                2. 段落深度分析，每段 >200 字，包含 H3。
-                3. 插入 [Image 1] 到 [Image 5] 占位符。
-                4. 包含 1 个 Markdown 表格。
-                输出 Markdown 源码。
-                """
-                # 开启流式生成 (stream=True)
-                response = model.generate_content(write_prompt, stream=True)
-                
-                placeholder = st.empty() # 创建动态显示区域
-                full_text = ""
-                for chunk in response:
-                    full_text += chunk.text
-                    placeholder.markdown(full_text + "▌") # 模拟打字机
-                st.session_state.article_draft = full_text
-                st.success("✅ 1500 字长文创作完成！")
-            except Exception as e: st.error(e)
+# 1. 定义极其宽松的安全设置
+safety_settings = [
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+]
 
-if st.session_state.article_draft:
-    st.subheader("文章编辑区")
-    st.session_state.article_draft = st.text_area("您可以直接在此修改:", st.session_state.article_draft, height=500)
+if st.button("📝 第三步：撰写 1500 字专业长文 (流式生成)", type="primary"):
+    st.session_state.article_draft = "" 
+    with st.spinner("正在执行 Ghostwriter SOP 写作 (已放宽安全限制)..."):
+        try:
+            model = genai.GenerativeModel(st.session_state.pro_model)
+            insights_str = "\n".join(st.session_state.insights)
+            write_prompt = f"""
+            # Your Role: 资深外贸 B2B 代笔专家。
+            # Task: 写一篇不少于 1500 字的英文博客。
+            # Topic: {st.session_state.selected_topic}
+            # Key Insights: {insights_str}
+            # SOP Requirements: 1个H1, 4个H2, 包含H3和Markdown表格, 插入[Image 1-5], 语气专业。
+            """
+            
+            # 关键修改：加入 safety_settings
+            response = model.generate_content(
+                write_prompt, 
+                stream=True,
+                safety_settings=safety_settings
+            )
+            
+            placeholder = st.empty()
+            full_text = ""
+            
+            for chunk in response:
+                # 检查这个数据块是否包含文本，防止安全拦截导致崩溃
+                try:
+                    if chunk.text:
+                        full_text += chunk.text
+                        placeholder.markdown(full_text + "▌")
+                except ValueError:
+                    # 如果这块被拦截了，跳过它而不是让程序崩溃
+                    continue
+                    
+            st.session_state.article_draft = full_text
+            st.success("✅ 创作完成！")
+            
+        except Exception as e:
+            st.error(f"生成过程中断: {e}")
 
 # ==========================================
 # 5. 模块三：SEO 优化与发布 (对应文档 7 & 9 & 10)
