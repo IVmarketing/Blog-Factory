@@ -218,6 +218,237 @@ else:
 
 
 
+import streamlit as st
+import google.generativeai as genai
+import os
+import math
+import time
+
+# ==========================================
+# 0. 页面配置与大模型初始化
+# ==========================================
+st.set_page_config(page_title="AI Writer - 工具 2：文章话题生成器", layout="wide")
+
+# 获取 API Key (优先从 Secrets 获取)
+api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    st.error("❌ 未检测到 GEMINI_API_KEY。请配置。")
+    st.stop()
+
+# 获取 Flash 模型 (用于大批量快速生成，省时省额度)
+@st.cache_resource
+def get_flash_model():
+    try:
+        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        target = next((m for m in available if "flash" in m), available[0])
+        return genai.GenerativeModel(target)
+    except:
+        return genai.GenerativeModel('models/gemini-1.5-flash')
+
+model = get_flash_model()
+
+# ==========================================
+# 1. 状态管理 (记录 4 步表单的数据)
+# ==========================================
+if 't2_step' not in st.session_state: st.session_state.t2_step = 1
+if 't2_countries' not in st.session_state: st.session_state.t2_countries = ""
+if 't2_product' not in st.session_state: st.session_state.t2_product = ""
+if 't2_company_type' not in st.session_state: st.session_state.t2_company_type = ""
+if 't2_my_country' not in st.session_state: st.session_state.t2_my_country = "中国"
+if 't2_topic_count' not in st.session_state: st.session_state.t2_topic_count = 150
+if 't2_results' not in st.session_state: st.session_state.t2_results = []
+
+# ==========================================
+# 2. UI 界面 - 头部说明
+# ==========================================
+st.title("💡 工具 2：文章话题生成器")
+st.markdown("""
+**欢迎使用【文章话题生成器】**
+通过回答 4 个简单问题，AI 就能为你生成大量精准的文章话题 [cite: 660-661]。
+* **回答问题**：每一步是一个关于你业务的问题。用中文回答即可，系统会自动翻译为英文话题 [cite: 662-663]。
+* **生成与后续**：选择想生成的话题数量（50~600个）。生成的话题建议保存到 Google Sheet 方便管理，接下来可用于 工具3 或 工具7 [cite: 664-667]。
+""")
+st.divider()
+
+# ==========================================
+# 3. 核心逻辑：4 步动态问答向导
+# ==========================================
+step = st.session_state.t2_step
+
+st.subheader(f"第 {step} / 4 步")
+st.info("提示：所有回答用中文即可，最后会帮你翻译成英文。生成的话题列表可直接用于「写文章原材料生成」或「批量发布」工具 [cite: 668-670]。")
+
+# --- 第 1 步：目标国家 ---
+if step == 1:
+    st.markdown("### **{目标国家}**")
+    st.markdown("**问题：** 你写文章针对的目标客户国家是哪一个或哪些？ [cite: 673-674]")
+    st.caption("**注释：** 支持填写多个国家，每行一个。欧盟因为认证体系统一，可以视为一个国家。系统会自动生成针对每个国家的话题 [cite: 675-676]。")
+    st.caption("**示例：**\n美国\n欧洲\n澳大利亚 [cite: 677-680]")
+    
+    current_val = st.text_area("你的回答：", value=st.session_state.t2_countries, height=120)
+    
+    if st.button("下一步 ➡️", type="primary"):
+        if not current_val.strip(): st.error("请至少填写一个国家")
+        else:
+            st.session_state.t2_countries = current_val
+            st.session_state.t2_step = 2
+            st.rerun()
+
+# --- 第 2 步：三级类目名称 ---
+elif step == 2:
+    st.markdown("### **{三级类目名称}**")
+    st.markdown("**问题：** 你本次想写文章宣传的产品是什么？ [cite: 691-692]")
+    st.caption("**注释：** 注意必须是二或三级类目，每次生成话题只能针对一个三级类目，不能是一级类目。例如：一级类目是无人机，二级类目是工业级无人机，三级类目是消防无人机 [cite: 693-694]。")
+    st.caption("**示例：** 消防无人机 / hydraulic motor [cite: 695-698]")
+    
+    current_val = st.text_input("你的回答：", value=st.session_state.t2_product)
+    
+    col1, col2 = st.columns([1, 6])
+    with col1:
+        if st.button("⬅️ 上一步"):
+            st.session_state.t2_step = 1
+            st.rerun()
+    with col2:
+        if st.button("下一步 ➡️", type="primary"):
+            if not current_val.strip(): st.error("请输入产品名称")
+            else:
+                st.session_state.t2_product = current_val
+                st.session_state.t2_step = 3
+                st.rerun()
+
+# --- 第 3 步：公司类型 ---
+elif step == 3:
+    st.markdown("### **{公司类型}**")
+    st.markdown("**问题：** 你写文章针对的目标客户公司/身份类型是什么？ [cite: 706-707]")
+    st.caption("**注释：** 支持填写多个类型，每行一个。例如：地方公共安全机构、能源基础设施运营商等。系统会自动生成针对每种类型的话题 [cite: 708-709]。")
+    st.caption("**示例：**\n地方公共安全机构\n能源及关键基础设施运营商 [cite: 710-713]")
+    
+    current_val = st.text_area("你的回答：", value=st.session_state.t2_company_type, height=120)
+    
+    col1, col2 = st.columns([1, 6])
+    with col1:
+        if st.button("⬅️ 上一步"):
+            st.session_state.t2_step = 2
+            st.rerun()
+    with col2:
+        if st.button("下一步 ➡️", type="primary"):
+            if not current_val.strip(): st.error("请至少填写一种公司类型")
+            else:
+                st.session_state.t2_company_type = current_val
+                st.session_state.t2_step = 4
+                st.rerun()
+
+# --- 第 4 步：你的国家 & 生成动作 ---
+elif step == 4:
+    st.markdown("### **{你的国家}**")
+    st.markdown("**问题：** 你想宣传的公司是哪个国家的？ [cite: 723-724]")
+    st.caption("**注释：** 如果没有海外分公司，一般填写中国 [cite: 725-726]。")
+    
+    current_val = st.text_input("你的回答：", value=st.session_state.t2_my_country)
+    
+    st.markdown("---")
+    # 话题数量选择
+    target_count = st.slider("选择想生成的话题数量 (50~600) [cite: 664-665]", min_value=50, max_value=600, value=st.session_state.t2_topic_count, step=50)
+    
+    col1, col2 = st.columns([1, 6])
+    with col1:
+        if st.button("⬅️ 上一步"):
+            st.session_state.t2_step = 3
+            st.rerun()
+    with col2:
+        if st.button("🚀 生成话题列表", type="primary"): [cite: 732]
+            st.session_state.t2_my_country = current_val
+            st.session_state.t2_topic_count = target_count
+            
+            # --- 核心计算逻辑：解析列表与组合排列 ---
+            # 1. 把多行文本拆成列表 [cite: 676, 709]
+            countries_list = [c.strip() for c in st.session_state.t2_countries.split('\n') if c.strip()]
+            company_types_list = [t.strip() for t in st.session_state.t2_company_type.split('\n') if t.strip()]
+            
+            # 2. 计算组合总数 
+            total_combinations = len(countries_list) * len(company_types_list)
+            # 计算每个组合需要生成多少个话题 (均摊)
+            topics_per_combo = math.ceil(target_count / total_combinations)
+            
+            st.session_state.t2_results = [] # 清空旧结果
+            
+            status_container = st.container()
+            with status_container:
+                st.info(f"检测到 {len(countries_list)} 个国家 × {len(company_types_list)} 个身份类型 = {total_combinations} 个组合 \n每个组合生成约 {topics_per_combo} 个话题，生成后自动去重 ")
+                
+                progress_bar = st.progress(0)
+                current_combo = 0
+                
+                # 3. 循环遍历每个组合进行调用 
+                for target_c in countries_list:
+                    for comp_type in company_types_list:
+                        current_combo += 1
+                        with st.spinner(f"[{current_combo}/{total_combinations}] 正在生成: {target_c} × {comp_type}... "):
+                            # 灵活适用任何行业的终极 Prompt
+                            prompt = f"""
+                            你是一个资深的 B2B 内容营销与 SEO 专家。
+                            我的公司位于：{st.session_state.t2_my_country}。
+                            我们推广的核心产品/服务是：{st.session_state.t2_product}。
+                            当前我需要针对目标市场：【{target_c}】，撰写针对【{comp_type}】这一目标客户的高转化 B2B 博客文章。
+                            
+                            请生成 {topics_per_combo} 个精准的【英文】文章话题（标题）。
+                            要求：
+                            1. 极度贴合上述行业的痛点、采购指南或技术趋势。
+                            2. 标题必须是英文。
+                            3. 直接输出标题列表，每行一个，不要带编号、横线或其他任何前言后语。
+                            """
+                            try:
+                                # 为避免 429 报错，如果是多个组合，稍微停顿一下
+                                if current_combo > 1: time.sleep(2) 
+                                response = model.generate_content(prompt)
+                                raw_lines = response.text.strip().split('\n')
+                                clean_lines = [line.strip().lstrip('0123456789.-* ') for line in raw_lines if line.strip()]
+                                st.session_state.t2_results.extend(clean_lines)
+                            except Exception as e:
+                                st.error(f"组合 {target_c}×{comp_type} 生成出错: {e}")
+                        
+                        progress_bar.progress(current_combo / total_combinations)
+                
+                # 4. 自动去重处理 
+                st.session_state.t2_results = list(dict.fromkeys(st.session_state.t2_results)) # 保持顺序去重
+                
+                # 如果去重后数量超了，截断到用户选定的数量
+                if len(st.session_state.t2_results) > target_count:
+                    st.session_state.t2_results = st.session_state.t2_results[:target_count]
+                
+                st.success("🎉 话题生成完毕！")
+
+# ==========================================
+# 4. 结果展示区
+# ==========================================
+if st.session_state.t2_results:
+    st.markdown("---")
+    st.subheader(f"文章话题列表（AI 生成，英文）- 共 {len(st.session_state.t2_results)} 个") [cite: 733]
+    
+    # 将列表转换为字符串方便复制
+    final_text = "\n".join(st.session_state.t2_results)
+    
+    st.text_area("一键复制原始文本 [cite: 744]：", value=final_text, height=400)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.download_button(
+            label="📥 导出 CSV [cite: 40]", 
+            data="Topic\n" + final_text, 
+            file_name=f"topics_{st.session_state.t2_product}.csv", 
+            mime="text/csv"
+        )
+    with col2:
+        if st.button("🔄 重置此工具 [cite: 737]"):
+            st.session_state.t2_step = 1
+            st.session_state.t2_results = []
+            st.rerun()
+
+
+
+
 
 
 # ==========================================
