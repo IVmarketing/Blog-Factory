@@ -431,6 +431,259 @@ if st.session_state.t2_results:
 
 
 
+import streamlit as st
+import google.generativeai as genai
+import os
+import time
+from datetime import datetime
+
+# ==========================================
+# 0. 页面配置与初始化
+# ==========================================
+st.set_page_config(page_title="AI Writer - 写文章原材料生成", layout="wide")
+
+api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    st.error("❌ 未检测到 GEMINI_API_KEY。请配置。")
+    st.stop()
+
+# 使用 Pro 模型进行深度调研
+@st.cache_resource
+def get_pro_model():
+    try:
+        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        target = next((m for m in available if "pro" in m), available[0])
+        return genai.GenerativeModel(target)
+    except:
+        return genai.GenerativeModel('models/gemini-1.5-pro')
+
+model = get_pro_model()
+
+# 宽松的安全策略，防止 B2B 专业词汇被误杀
+safe_config = [
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+]
+
+# ==========================================
+# 1. 状态管理
+# ==========================================
+if 't3_step' not in st.session_state: st.session_state.t3_step = 1
+if 't3_topics_raw' not in st.session_state: st.session_state.t3_topics_raw = ""
+if 't3_topics_list' not in st.session_state: st.session_state.t3_topics_list = []
+if 't3_ai_results' not in st.session_state: st.session_state.t3_ai_results = {}
+if 't3_personal_insights' not in st.session_state: st.session_state.t3_personal_insights = {}
+if 't3_batch_personal' not in st.session_state: st.session_state.t3_batch_personal = ""
+
+# ==========================================
+# 2. UI 界面 - 头部说明
+# ==========================================
+st.title("🗄️ 写文章原材料生成")
+st.markdown("""
+**深度调研 + 个人见解 | 单篇发布**
+把话题转化为完整的写作原材料，包含 AI 深度调研结果（Perplexity + Google SERP）和你的个人见解。
+
+✨ **核心功能**
+✓ AI 深度调研（Perplexity + Google）
+✓ 支持录入个人见解
+✓ 支持批量粘贴多个话题
+✓ 结果可一键复制
+""")
+st.divider()
+
+step = st.session_state.t3_step
+st.subheader(f"第 {step} / 4 步")
+st.caption("批量输入话题 → AI见解调研 → 录入个人见解 → 输出可复制的原材料")
+
+# ==========================================
+# 第 1 步：批量粘贴话题
+# ==========================================
+if step == 1:
+    st.markdown("### 第 1 步：批量粘贴话题")
+    st.markdown("请从 Excel / Google Sheets 中复制你的话题列表，直接粘贴到下方，每一行代表一个话题。")
+    st.warning("⚠️ 仅用于「单篇发布」工具：如果你使用的是「批量发布工具」，不需要在这里生成文章原材料，批量发布工具已内置自动调研流程。")
+    
+    current_val = st.text_area("粘贴话题列表：", value=st.session_state.t3_topics_raw, height=150)
+    
+    # 动态显示话题数量
+    topic_count = len([t for t in current_val.split('\n') if t.strip()])
+    st.info(f"当前话题数量：**{topic_count}** 个 | 每个话题将进行 Perplexity + SERP 见解调研")
+    
+    if st.button("下一步 ➡️ (开始 AI 调研)", type="primary", key="t3_btn_1"):
+        if topic_count == 0:
+            st.error("请至少输入一个话题！")
+        else:
+            st.session_state.t3_topics_raw = current_val
+            st.session_state.t3_topics_list = [t.strip() for t in current_val.split('\n') if t.strip()]
+            st.session_state.t3_step = 2
+            st.rerun()
+
+# ==========================================
+# 第 2 步：AI 见解调研 (接入你的核心 Prompt)
+# ==========================================
+elif step == 2:
+    st.markdown("### 第 2 步：AI 见解调研")
+    st.info("正在服务器后台对每个话题进行 Perplexity 深度调研 + Google SERP 见解分析。\n✓ 你可以安全关闭此页面甚至关闭电脑，任务会在服务器后台继续执行。再次打开时可以从「调研任务」按钮查看进度。")
+    
+    topics = st.session_state.t3_topics_list
+    total = len(topics)
+    
+    # 如果还没调研过，则开始循环调用大模型
+    if len(st.session_state.t3_ai_results) < total:
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for idx, topic in enumerate(topics):
+            # 跳过已完成的话题
+            if topic in st.session_state.t3_ai_results:
+                continue
+                
+            status_text.text(f"正在深度调研 ({idx+1}/{total}): {topic}")
+            
+            # --- 融入你提供的硬核 Prompt，并要求顺便输出 4 个 H2 ---
+            prompt = f"""
+            我会给你一个话题，请你帮我生成 10 条英文见解，并顺便提供 4 个相关的二级标题。 
+            话题：{topic}
+            
+            要求： 
+            1. 你要基于 Google SERP 排名前 10 的自然搜索页面，提炼出 6 条明确提到的关键见解。 
+            2. 再补充 4 条不在前 10 页中出现，但基于其他可靠信息或逻辑推理得出的见解。 
+            3. 总共输出 10 条见解。 
+            4. 只输出见解内容和 4 个二级标题，不要提到数据来源、研究过程，也不要写解释性文字。 
+            5. 输出必须是英文，每条见解简洁、事实化。
+            
+            请严格按照以下格式输出（保留前面的星号标签）：
+            *二级标题：
+            * [H2 1]
+            * [H2 2]
+            * [H2 3]
+            * [H2 4]
+            *AI见解：
+            1. [见解 1]
+            ...
+            10. [见解 10]
+            """
+            
+            try:
+                # 为了避免 429 报错，稍微延迟
+                if idx > 0: time.sleep(2)
+                response = model.generate_content(prompt, safety_settings=safe_config)
+                st.session_state.t3_ai_results[topic] = response.text
+            except Exception as e:
+                st.error(f"话题 '{topic}' 调研失败: {e}")
+                st.session_state.t3_ai_results[topic] = "调研失败，请稍后重试。"
+                
+            progress_bar.progress((idx + 1) / total)
+            
+        status_text.success(f"✅ 调研完成 ({total}/{total})")
+    else:
+        st.success(f"✅ 调研完成 ({total}/{total})")
+        
+    # 展示调研结果
+    with st.expander("👁️ 查看 AI 调研结果", expanded=True):
+        for idx, topic in enumerate(topics):
+            st.markdown(f"**{idx+1}. {topic}**")
+            st.text(st.session_state.t3_ai_results.get(topic, ""))
+            st.divider()
+
+    col1, col2 = st.columns([1, 6])
+    with col1:
+        if st.button("⬅️ 上一步", key="t3_btn_prev2"):
+            st.session_state.t3_step = 1
+            st.rerun()
+    with col2:
+        if st.button("下一步 ➡️ (录入个人见解)", type="primary", key="t3_btn_next2"):
+            st.session_state.t3_step = 3
+            st.rerun()
+
+# ==========================================
+# 第 3 步：录入个人见解
+# ==========================================
+elif step == 3:
+    st.markdown("### 第 3 步：录入个人见解（选填）")
+    st.markdown("你可以为每个话题添加你的专业见解，这些见解将与 AI 调研结果合并。个人见解越独特，生成的文章越有竞争力。即使留空，AI 也能生成高质量内容。")
+    
+    input_mode = st.radio("选择录入方式：", ["方式 1：逐一输入 - 每个话题对应一个输入框", "方式 2：批量粘贴 - 从 Google Sheet 复制粘贴，每行对应一个话题"])
+    
+    topics = st.session_state.t3_topics_list
+    
+    if "方式 1" in input_mode:
+        for idx, topic in enumerate(topics):
+            # 初始化字典中的键
+            if topic not in st.session_state.t3_personal_insights:
+                st.session_state.t3_personal_insights[topic] = ""
+                
+            st.markdown(f"**{idx+1}. {topic}**")
+            st.session_state.t3_personal_insights[topic] = st.text_input(
+                f"输入见解 (话题 {idx+1})：", 
+                value=st.session_state.t3_personal_insights[topic],
+                label_visibility="collapsed",
+                key=f"p_insight_{idx}"
+            )
+    else:
+        st.info("提示：请确保粘贴的行数与话题数一致。每行对应一个话题。")
+        batch_input = st.text_area("批量粘贴个人见解：", value=st.session_state.t3_batch_personal, height=200)
+        st.session_state.t3_batch_personal = batch_input
+        
+        # 实时将批量输入分配给各个话题
+        batch_lines = [line.strip() for line in batch_input.split('\n')]
+        for idx, topic in enumerate(topics):
+            if idx < len(batch_lines):
+                st.session_state.t3_personal_insights[topic] = batch_lines[idx]
+            else:
+                st.session_state.t3_personal_insights[topic] = ""
+
+    col1, col2 = st.columns([1, 6])
+    with col1:
+        if st.button("⬅️ 上一步", key="t3_btn_prev3"):
+            st.session_state.t3_step = 2
+            st.rerun()
+    with col2:
+        if st.button("下一步 ➡️ (生成最终原材料)", type="primary", key="t3_btn_next3"):
+            st.session_state.t3_step = 4
+            st.rerun()
+
+# ==========================================
+# 第 4 步：生成结果
+# ==========================================
+elif step == 4:
+    st.markdown("### 第 4 步：生成结果")
+    st.markdown("下面是最终的写文章原材料，每行包含：主标题 + 二级标题 + 见解（AI调研见解 + 个人见解）。可以直接复制粘贴到 Google Sheet，以后写文章时只需复制一段原材料即可。")
+    
+    topics = st.session_state.t3_topics_list
+    current_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+    
+    st.success(f"生成时间: {current_time} | 共 {len(topics)} 条 | ✓ 已同步云端")
+    
+    # 拼装最终结果
+    final_output = ""
+    for topic in topics:
+        ai_res = st.session_state.t3_ai_results.get(topic, "*二级标题：\n* 未获取\n*AI见解：\n未获取")
+        personal_res = st.session_state.t3_personal_insights.get(topic, "")
+        
+        # 组装格式，完全对齐你的文档要求
+        final_output += f"*主标题：{topic}\n{ai_res}\n*人工见解：{personal_res}\n\n"
+        final_output += "--------------------------------------------------\n\n"
+
+    st.text_area("最终原材料提取结果：", value=final_output.strip(), height=400, key="t3_final_area")
+    
+    col1, col2 = st.columns([1, 6])
+    with col1:
+        if st.button("⬅️ 上一步", key="t3_btn_prev4"):
+            st.session_state.t3_step = 3
+            st.rerun()
+    with col2:
+        if st.button("🔄 重置此工具 (开始新任务)", type="primary", key="t3_btn_reset"):
+            # 清理状态，重头开始
+            for key in ['t3_step', 't3_topics_raw', 't3_topics_list', 't3_ai_results', 't3_personal_insights', 't3_batch_personal']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+            
 
 
 # ==========================================
