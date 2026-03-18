@@ -358,7 +358,7 @@ elif step == 4:
             st.session_state.t2_step = 3
             st.rerun()
     with col2:
-        if st.button("🚀 生成话题列表", type="primary"): [cite: 732]
+        if st.button("🚀 生成话题列表", type="primary"):
             st.session_state.t2_my_country = current_val
             st.session_state.t2_topic_count = target_count
             
