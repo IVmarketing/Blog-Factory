@@ -8,24 +8,30 @@ from requests.auth import HTTPBasicAuth
 from datetime import datetime, timedelta
 
 # ==========================================
-# 0. 全局配置与模型初始化
+# 0. 全局配置与模型初始化 (对接第三方中转 API)
 # ==========================================
 st.set_page_config(page_title="AI Writer 工业化中心 (终极完整版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
 
-if api_key: genai.configure(api_key=api_key)
-else: st.stop()
+if api_key: 
+    # ⚠️ 核心修改 1：指定中转域名，并强制使用 REST 协议
+    genai.configure(
+        api_key=api_key,
+        transport="rest",
+        client_options={"api_endpoint": "https://api.viviai.cc"}
+    )
+else: 
+    st.error("❌ 未检测到 GEMINI_API_KEY。请配置。")
+    st.stop()
 
+# ⚠️ 核心修改 2：跳过模型搜索，直接锁定淘宝商家提供的模型
 @st.cache_resource
 def get_model(model_type="flash"):
-    try:
-        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        target = next((m for m in available if model_type in m), available[0])
-        return genai.GenerativeModel(target)
-    except:
-        return genai.GenerativeModel(f'models/gemini-1.5-{model_type}')
+    # 第三方中转站通常会屏蔽 SDK 自带的 list_models() 方法，导致原代码报错。
+    # 这里直接硬编码强制调用商家提供的模型名：
+    return genai.GenerativeModel('models/gemini-3-flash-preview')
 
 model_flash = get_model("flash")
 model_pro = get_model("pro")
@@ -36,6 +42,7 @@ safe_config = [
     {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
 ]
+
 
 # ==========================================
 # 1. 全局状态管理 (集中初始化所有工具的变量)
