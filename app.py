@@ -281,11 +281,11 @@ def tool2_topics():
                 st.rerun()
 
 # ==========================================
-# 工具 3：写文章原材料生成
+# 工具 3：写文章原材料生成 (严格执行自定义 Prompt)
 # ==========================================
 def tool3_materials():
     st.title("🗄️ 工具 3：写文章原材料生成")
-    st.caption("把话题转化为完整的写作原材料，包含 AI 深度调研结果和你的个人见解。")
+    st.caption("把话题转化为完整的写作原材料，包含 AI 深度调研结果（Perplexity + Google SERP）和你的个人见解。")
     st.divider()
 
     step = st.session_state.t3_step
@@ -314,13 +314,41 @@ def tool3_materials():
             st_txt = st.empty()
             for idx, topic in enumerate(topics):
                 if topic in st.session_state.t3_ai_results: continue
-                st_txt.text(f"正在深度调研 ({idx+1}/{total}): {topic}")
-                prompt = f"针对话题：{topic}\n提炼出6条来自SERP的关键见解，补充4条逻辑推理见解，提供4个英文二级标题。\n格式：\n*二级标题：\n* [H2 1]...\n*AI见解：\n1. [见解1]..."
+                st_txt.text(f"正在执行深度调研任务 ({idx+1}/{total}): {topic}")
+                
+                # ---------------------------------------------------------
+                # 💡 核心注入：100% 严格执行你提供的 Prompt 逻辑
+                # ---------------------------------------------------------
+                prompt = f"""
+我会给你一个问题，请你帮我生成 10 条英文见解。 
+问题（话题）：{topic}
+
+要求： 
+1. 你要基于 Google SERP 排名前 10 的自然搜索页面，提炼出 6 条明确提到的关键见解。 
+2. 再补充 4 条不在前 10 页中出现，但基于其他可靠信息或逻辑推理得出的见解。 
+3. 总共输出 10 条见解。 
+4. 只输出见解内容，不要提到数据来源、研究过程，也不要写解释性文字。 
+5. 输出必须是英文，每条见解简洁、事实化。
+
+---
+【系统排版要求】：为了衔接下一个写作工具，请在输出上述 10 条见解的同时，顺便提供 4 个相关的英文二级标题 (H2)。并严格按照以下固定格式输出（必须保留前面的星号标签）：
+
+*二级标题：
+* [H2 1]
+* [H2 2]
+* [H2 3]
+* [H2 4]
+*AI见解：
+1. [见解 1]
+2. [见解 2]
+...
+10. [见解 10]
+                """
                 try:
                     if idx > 0: time.sleep(1.5)
                     st.session_state.t3_ai_results[topic] = model_pro.generate_content(prompt, safety_settings=safe_config).text
                 except Exception as e:
-                    st.session_state.t3_ai_results[topic] = "调研失败。"
+                    st.session_state.t3_ai_results[topic] = "调研失败，请检查网络或 API 额度。"
                 pb.progress((idx + 1) / total)
             st_txt.success(f"✅ 调研完成 ({total}/{total})")
         else:
@@ -390,7 +418,7 @@ def tool3_materials():
                 st.rerun()
 
 # ==========================================
-# 工具 4：文章生成器
+# 工具 4：文章生成器 (严格执行 1500 字 PAS 顶级提示词)
 # ==========================================
 def tool4_article():
     st.title("✍️ 工具 4：文章生成器")
@@ -398,42 +426,84 @@ def tool4_article():
     st.divider()
 
     st.subheader("第 1 步：确认角色背景")
-    persona_input = st.text_area("角色背景 (默认读取工具1)：", value=st.session_state.persona_en, height=150)
+    persona_input = st.text_area("角色背景 (默认读取工具1，将自动注入 Prompt 的 My Role 中)：", value=st.session_state.persona_en, height=150)
 
     st.subheader("第 2 步：输入写作原材料")
     mat_input = st.text_area("粘贴从工具3生成的写作原材料 (取单篇即可)：", value=st.session_state.t3_final_materials.split('---')[0].strip() if st.session_state.t3_final_materials else "", height=200)
 
-    if st.button("📝 生成文章 (流式输出 约1-3分钟)", type="primary"):
-        if not mat_input.strip() or not persona_input.strip(): st.error("背景和原材料不能为空！")
+    if st.button("📝 生成文章 (流式输出，约需 1-3 分钟)", type="primary", key="t4_gen"):
+        if not mat_input.strip() or not persona_input.strip(): 
+            st.error("背景和原材料不能为空！")
         else:
             st.session_state.t4_article_draft = ""
-            with st.spinner("AI 正在严格执行 SOP 撰写 1500 字长文..."):
+            with st.spinner("AI 正在严格执行顶级 SEO SOP 撰写长文，请耐心等待..."):
+                
+                # ---------------------------------------------------------
+                # 💡 核心注入：100% 像素级还原你的顶级 PAS 文章生成 Prompt
+                # ---------------------------------------------------------
                 prompt = f"""
-                # Your Role: Write a blog article matching my tone.
-                # Materials:
-                {mat_input}
-                Structure strictly as follows:
-                # [Main Title?]
-                ![alt]("https://placehold.co/600x400.jpg")
-                [PAS intro, first person, max 30 words]
-                **[Snippet answer, 30-50 words]**
-                [Transition]
-                
-                ## [H2 Title 1?]
-                [PAS intro, max 30 words]
-                **[Snippet answer, 30-50 words]**
-                ![alt]("https://placehold.co/600x400.jpg")
-                [Dive deeper paragraph: Min 200 words, use H3 and Markdown tables]
-                (Repeat for exactly 4 H2s)
-                
-                ## Conclusion
-                [Summary, max 30 words]
+# Your Role:
+你是一个我写博客文章的枪手，你会使用我的口吻，用Markdown语言输出指定格式的博客文章。
 
-                # My Background:
-                {persona_input}
-                # Requirements: Total > 1500 words. Plain English. Only Markdown output. No meta-explanations like 'Dive deeper paragraph:'.
-                """
+# Your Responsibilities:
+当我输入如下格式的内容给你时:
+{mat_input}
+
+你按照如下的格式输出一篇文章给我：
+
+# 这里是文章的主标题，以问号结尾
+
+[图片占位符]
+
+Leading paragraph:
+开头第一段，会使用PAS策略，吸引读者注意力，在这一段里使用第一人称的语气。(Max 30 words)
+
+Featured paragraph:
+**开头第二段，回答标题提出的问题，这个段落，后面会用来竞争谷歌的精选摘要。** (Min 30 words and Max 50 words)
+
+Transition paragraph:
+承上启下的段落，会挽留客户继续往下阅读。
+
+LOOP START
+
+## 我输入给你的二级标题，也是以问号结尾
+
+Leading paragraph:
+开头第一段，会使用PAS策略，吸引读者注意力，在这一段里使用第一人称的语气。(Max 30 words)
+
+Featured paragraph:
+**开头第二段，回答标题提出的问题，这个段落，后面会用来竞争谷歌的精选摘要。** (Min 30 words and Max 50 words)
+
+[图片占位符]
+
+Dive deeper paragraph:
+根据二级标题，继续延展和深入，可以用批判性思维，来拆分问题，帮助读者更加深入地理解。(Min 200 words)
+
+LOOP END
+
+## Conclusion
+
+写一段结论，总结全文。(Max 30 words)
+
+## My Role:
+{persona_input}
+
+# My Requirements:
+1. 文章的长度，不得少于1500个单词，文章的每个Dive deeper paragraph，都不得少于200个单词；
+2. 全文除了所有的Featured paragraphs必须使用第一人称的口吻进行写作，在必要时补充个人故事（我会稍后替换）；
+3. 在二级标题之下的段落中，当进行Dive deeper paragraph写作时，多穿插一些必要的Markdown格式的H3s和表格；
+4. 写作风格介于书面学术写作和口语描述之间，所有句子都有主语，使用Plain English和简单词汇，让高中学生也能读懂，不要用复杂的长难句，不要用复杂、高级、生僻的词汇，尽可能用短句输出，替换掉非日常的词汇；
+5. 将所有句子中过渡词和连接词替换成最基础，最常用的词语，尽可能试试简单的、直接的表达方式，避免使用复杂或生僻的词汇。保证句子的逻辑关系清晰，不要主动添加任何总结（除非文章最后的Conslusion部分）；
+6. 你输出给我的内容不能包含任何Leading paragraph:、Featured paragraph:、Transition paragraph:、Dive deeper paragraph:、LOOP START、LOOP END这些或类似于这些的解释性文本；
+7. 图片占位符用以下链接表示：![alt with keywords]("https://placehold.co/600x400.jpg")
+8. 文章默认使用英语输出；
+9. 你输出给我的文章，必须转换成Markdown格式；
+10. 你输出给我的内容，必须包含3个表格。
+11. 在每个二级标题下的Featured paragraph下边的位置生成图片占位符。
+12. 在每个二级标题下的图片占位符之下的位置都要生成Dive deeper paragraph。
+"""
                 try:
+                    # 开启流式输出
                     res = model_pro.generate_content(prompt, stream=True, safety_settings=safe_config)
                     ph = st.empty()
                     txt = ""
@@ -443,7 +513,8 @@ def tool4_article():
                             ph.markdown(txt + "▌")
                     st.session_state.t4_article_draft = txt
                     st.success("✅ 文章生成完毕！")
-                except Exception as e: st.error(f"生成中断: {e}")
+                except Exception as e: 
+                    st.error(f"生成中断: {e}")
 
     if st.session_state.t4_article_draft:
         st.subheader("第 3 步：编辑与使用")
@@ -451,21 +522,33 @@ def tool4_article():
         with c1:
             if st.button("✅ 一键校验格式", key="t4_val"):
                 d = st.session_state.t4_article_draft
-                st.session_state.t4_validation_res = f"字数: {len(d.split())} 词 | H2数量: {d.count('## ')-d.count('### ')-1} | 图片: {d.count('![')} | 表格: {d.count('|---|')}"
-        with c2: lang = st.selectbox("翻译:", ["简体中文", "Español", "Deutsch"], label_visibility="collapsed")
+                words = len(d.split())
+                h2_count = d.count("## ") - d.count("### ") - (1 if "## Conclusion" in d else 0)
+                img_count = d.count("![")
+                table_count = d.count("|---|")
+                st.session_state.t4_validation_res = f"字数: {words} 词 | H2数量: {h2_count} | 图片: {img_count} | 表格: {table_count}"
+        with c2: 
+            lang = st.selectbox("翻译:", ["简体中文", "Español", "Deutsch"], label_visibility="collapsed")
         with c3:
             if st.button("🌐 翻译此文", key="t4_trans"):
                 try:
-                    res = model_flash.generate_content(f"Translate to {lang}, keep markdown:\n{st.session_state.t4_article_draft}", safety_settings=safe_config)
+                    trans_prompt = f"Translate the following Markdown article into {lang}. Keep all the Markdown formatting (like #, ##, tables, and image links) intact:\n\n{st.session_state.t4_article_draft}"
+                    res = model_flash.generate_content(trans_prompt, safety_settings=safe_config)
                     st.session_state.t4_article_draft = res.text
                     st.success(f"已翻译为 {lang}")
-                except Exception as e: st.error(e)
+                except Exception as e: 
+                    st.error(e)
 
-        if st.session_state.t4_validation_res: st.info(st.session_state.t4_validation_res)
-        st.session_state.t4_article_draft = st.text_area("Markdown 编辑器：", value=st.session_state.t4_article_draft, height=500, key="t4_editor")
+        if st.session_state.t4_validation_res: 
+            st.info(st.session_state.t4_validation_res)
+        
+        st.session_state.t4_article_draft = st.text_area("Markdown 编辑器：", value=st.session_state.t4_article_draft, height=600, key="t4_editor")
+        
+        with st.expander("👁️ 预览网页渲染效果"):
+            st.markdown(st.session_state.t4_article_draft, unsafe_allow_html=True)
 
 # ==========================================
-# 工具 5：文章配图 + 一键发布
+# 工具 5：文章配图 + 一键发布 (严格执行 SEO 与配图 Prompt)
 # ==========================================
 def tool5_publish():
     st.title("🚀 工具 5：文章配图 + 一键发布")
@@ -477,28 +560,130 @@ def tool5_publish():
 
     st.subheader("第 3 步：自动处理 (图片提示词 + SEO + 脚注)")
     c1, c2, c3 = st.columns(3)
+    
+    # ---------------------------------------------------------
+    # 💡 核心一：Recraft 精细配图提示词生成
+    # ---------------------------------------------------------
     with c1:
-        if st.button("🎨 1. 生成配图 Prompt", use_container_width=True):
+        if st.button("🎨 1. 生成 5 张配图 Prompt", use_container_width=True):
             if not md_input: st.error("请粘贴文章！")
             else:
-                p = f"Generate FIVE Midjourney prompts for this article. Format: Chinese Title + 70+ words English desc.\nArticle:\n{md_input}\nPersona:\n{persona_input}"
-                st.session_state.t5_img_prompts = model_flash.generate_content(p, safety_settings=safe_config).text
-                st.success("✅ 配图 Prompt 生成完毕")
+                with st.spinner("生成 Recraft 级提示词中..."):
+                    img_prompt = f"""
+# Your Role:
+You will generate Recraft.ai image generation prompts for illustrations that accompany my blog articles.
+
+# Your Responsibilities:
+When I provide you with the content of a blog article, you must generate five image generation prompts that accurately match the meaning or scenario described in the input.
+
+Each prompt must follow these guidelines:
+1. Start each prompt with a concise Chinese title that summarizes the scene depicted. Ensure the title is clearly separated from the prompt text and does not mix with it.
+2. Each prompt must be at least 70 words long and written in clear, specific English. Avoid vague descriptions.
+3. Each prompt should provide a detailed description of the image, including:
+• Objects, people, and scene elements
+• Colors, lighting, and atmosphere
+• Perspective (e.g., close-up shot, wide-angle, aerial view, etc.)
+• Possible artistic style (e.g., photography, 3D render, digital illustration, etc.)
+
+# Article Content:
+{md_input}
+
+# My Role (Persona Context):
+{persona_input}
+
+# My Requirements (Output Guidelines)
+1. All prompts must be written in English.
+2. Each prompt must be at least 70 words long.
+3. Each prompt must begin with a Chinese title summarizing the scene, ensuring it is distinct from the prompt itself.
+4. The prompts must be precise and vivid, aligned with my industry background. Avoid vague or generic descriptions.
+                    """
+                    st.session_state.t5_img_prompts = model_flash.generate_content(img_prompt, safety_settings=safe_config).text
+                    st.success("✅ 配图 Prompt 生成完毕")
+
+    # ---------------------------------------------------------
+    # 💡 核心二：图片 SEO 优化
+    # ---------------------------------------------------------
     with c2:
         if st.button("🖼️ 2. 优化图片 SEO", use_container_width=True):
             if not md_input: st.error("请粘贴文章！")
             else:
-                p = f"Replace `[Image X]` with SEO markdown: `![Alt Text (≤15 words)](https://placehold.co/800x400.png \"Title (≤5 words)\")`. Output full markdown.\n\n{md_input}"
-                st.session_state.t5_seo_markdown = model_flash.generate_content(p, safety_settings=safe_config).text
-                st.success("✅ 图片 SEO 注入完毕")
+                with st.spinner("执行严格的图片 SEO 标准中..."):
+                    seo_prompt = f"""
+# Your Role:
+You are an SEO expert specializing in image SEO optimization to enhance search engine visibility for my website.
+
+# Article Content:
+{md_input}
+
+# Your Responsibilities:
+Find ALL `[Image X]` placeholders or dummy image tags in the article. You must replace them with SEO-optimized metadata for each image in the following Markdown format:
+`![Alternative text, concise image description (≤15 words)](#placeholder_link "Title text (≤5 words)")`
+
+Key Formatting Rules:
+1. Alternative Text (Alt Text): Describe the image concisely in 15 words or fewer. Make it descriptive and meaningful for both SEO and accessibility.
+2. Title Text: Keep it 5 words or fewer. It should be a short, catchy phrase that enhances the image’s SEO relevance.
+
+# My Requirements (Output Guidelines)
+1. All outputs must be in English.
+2. IMPORTANT: Output the FULL updated article in Markdown format with the placeholders replaced. Do not just output the image tags.
+3. Ensure descriptions are relevant to my industry and improve SEO rankings for my website.
+                    """
+                    st.session_state.t5_seo_markdown = model_flash.generate_content(seo_prompt, safety_settings=safe_config).text
+                    st.success("✅ 图片 SEO 注入完毕")
+
+    # ---------------------------------------------------------
+    # 💡 核心三：双向高级脚注植入
+    # ---------------------------------------------------------
     with c3:
-        if st.button("🔗 3. 注入双向脚注", use_container_width=True):
+        if st.button("🔗 3. 注入 10 个双向脚注", use_container_width=True):
             src = st.session_state.t5_seo_markdown or md_input
             if not src: st.error("请先完成前置步骤！")
             else:
-                p = f"Insert exactly 10 manual bidirectional footnotes (using `<sup>[1](#footnote-1){{#ref-1}}</sup>` in text and `<span id=\"footnote-1\">1. Short explanation. [↩︎](#ref-1)</span>` in '## Footnotes' section at end). Output full markdown.\n\n{src}"
-                st.session_state.t5_final_markdown = model_pro.generate_content(p, safety_settings=safe_config).text
-                st.success("✅ 脚注系统植入完毕")
+                with st.spinner("构建高级双向脚注系统 (约需 30 秒)..."):
+                    fn_prompt = f"""
+## Your Role
+You are an SEO expert responsible for enhancing articles by inserting relevant external links while maintaining readability, proper formatting, and structured footnotes in Markdown format.
+
+## Input
+{src}
+
+## Output Guidelines
+1. **Identify Key Phrases for Hyperlinking**
+   * Select meaningful noun phrases that require additional explanation or supporting data.
+   * Do not hyperlink single words; instead, choose context-rich phrases that fit naturally within the content.
+   * Exclude bolded paragraphs from hyperlinking.
+
+2. **Insert Hyperlinks Correctly**
+   * Embed links directly within the content using Markdown format (e.g., `[ISO 9001](https://www.example.com)`).
+   * Avoid adding separate footnotes within bolded paragraphs.
+   * Display the footnote number as an **upward superscript digit** using `<sup>` (e.g., `[ISO 9001](https://www.example.com) <sup>[1](#footnote-1){{#ref-1}}</sup>`).
+
+3. **Ensure Proper Footnote Usage**
+   * Do **not** use Markdown Extra’s `[^1]` syntax. Instead, implement a **manual bidirectional system**:
+     * In the main text: `<sup>[1](#footnote-1){{#ref-1}}</sup>`
+     * In the footnotes: `<span id="footnote-1">1. Short explanation. [↩︎](#ref-1)</span>`
+   * At the bottom of the article, create a **“Footnotes”** section listing all referenced links.
+   * Each footnote should include a concise explanation (max 20 words) of why users should visit the link.
+   * After each footnote entry, add a **return link `[↩︎]`** that navigates back to the corresponding keyword in the main text.
+   * Each footnote number must be unique and non-repetitive to ensure accurate linking.
+
+4. **Maintain Consistency and Readability**
+   * Each article must contain **exactly ten external links** — no more, no less.
+   * No duplicate key phrases should be hyperlinked.
+   * The selected phrases should be seamlessly integrated within the article to maintain smooth readability.
+
+5. **Ensure Markdown Formatting for Output**
+   * The final output must be the **FULL UPDATED ARTICLE in Markdown format** after inserting hyperlinks and footnotes.
+   * You may use minimal HTML tags (`<sup>`, `<span>`) to enable superscripts and anchor navigation.
+   * Avoid unnecessary HTML to ensure compatibility across Markdown-based platforms.
+
+---
+## Example Formatting
+✅ Correct:
+Certifications such as [ISO 9001](https://www.example.com) <sup>[1](#footnote-1){{#ref-1}}</sup> demonstrate a supplier’s commitment to quality management.
+                    """
+                    st.session_state.t5_final_markdown = model_pro.generate_content(fn_prompt, safety_settings=safe_config).text
+                    st.success("✅ 脚注系统植入完毕")
 
     if st.session_state.t5_img_prompts:
         with st.expander("👁️ 查看配图 Prompt"): st.code(st.session_state.t5_img_prompts, language="markdown")
@@ -531,17 +716,17 @@ def tool5_publish():
                 except Exception as e: st.error(e)
 
 # ==========================================
-# 工具 7：全自动批量发布工具 (无人值守)
+# 工具 7：全自动批量发布工具 (搭载顶级 SEO 提示词)
 # ==========================================
 def tool7_batch_publish():
     st.title("🤖 工具 7：全自动批量发布与排期 (无人值守)")
-    st.markdown("**🔥 终极效率工具**：只需输入话题列表，即可全自动批量处理：**调研 → 写文章 → SEO/脚注 → WP排期发布**。")
+    st.markdown("**🔥 终极效率工具**：搭载顶级 PAS 模型与双向脚注系统，全自动批量处理：**调研 → 写长文 → SEO/脚注 → WP排期发布**。")
     st.divider()
 
     col1, col2 = st.columns([1, 1])
     with col1:
         st.subheader("1. 基础素材配置")
-        persona_input = st.text_area("角色背景 (必填)：", value=st.session_state.persona_en, height=150)
+        persona_input = st.text_area("角色背景 (必填，将自动注入到每篇文章的设定中)：", value=st.session_state.persona_en, height=150)
         default_topics = "\n".join(st.session_state.t2_results) if st.session_state.t2_results else ""
         topics_input = st.text_area("粘贴批量话题 (每行一个，建议一次 10-50 个)：", value=default_topics, height=200)
 
@@ -563,7 +748,7 @@ def tool7_batch_publish():
             st.error("⚠️ 请确保填完了话题、背景以及 WordPress 的三个凭证！")
             return
             
-        st.success(f"初始化成功！共检测到 {len(topics)} 个任务。即将开始无人值守作业...")
+        st.success(f"初始化成功！共检测到 {len(topics)} 个任务。系统已加载顶级 Prompt 引擎，即将开始无人值守作业...")
         
         progress_bar = st.progress(0)
         status_box = st.empty()
@@ -576,24 +761,118 @@ def tool7_batch_publish():
         for idx, topic in enumerate(topics):
             status_box.info(f"🔄 **正在处理第 {idx+1}/{len(topics)} 篇**: {topic}")
             try:
-                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🔍 开始调研...")
+                # ---------------------------------------------------------
+                # 步骤 A: 顶级深度调研 (10条见解 + 4个H2)
+                # ---------------------------------------------------------
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🔍 开始基于 SERP 进行深度调研...")
                 log_box.code("\n".join(logs[-5:]))
-                research_p = f"针对话题：{topic}\n提炼出6条SERP见解，补充4条推理见解，提供4个英文二级标题。\n格式：\n*二级标题：\n* [H2]...\n*AI见解：\n1. [见解]..."
+                
+                research_p = f"""
+我会给你一个问题，请你帮我生成 10 条英文见解。 
+问题（话题）：{topic}
+
+要求： 
+1. 你要基于 Google SERP 排名前 10 的自然搜索页面，提炼出 6 条明确提到的关键见解。 
+2. 再补充 4 条不在前 10 页中出现，但基于其他可靠信息或逻辑推理得出的见解。 
+3. 总共输出 10 条见解。 
+4. 只输出见解内容，不要提到数据来源、研究过程，也不要写解释性文字。 
+5. 输出必须是英文，每条见解简洁、事实化。
+
+---
+【系统排版要求】：为了衔接下一个写作工具，请在输出上述 10 条见解的同时，顺便提供 4 个相关的英文二级标题 (H2)。并严格按照以下固定格式输出（必须保留前面的星号标签）：
+*二级标题：
+* [H2 1]
+* [H2 2]
+* [H2 3]
+* [H2 4]
+*AI见解：
+1. [见解 1]
+...
+10. [见解 10]
+                """
                 ai_insights = model_pro.generate_content(research_p, safety_settings=safe_config).text
-                time.sleep(3) 
+                time.sleep(4) # 缓冲
                 
-                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] ✍️ 开始撰写 1500 字长文...")
+                # ---------------------------------------------------------
+                # 步骤 B: 顶级 1500 字 PAS 结构长文
+                # ---------------------------------------------------------
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] ✍️ 开始执行 PAS 结构撰写 1500 字深度长文...")
                 log_box.code("\n".join(logs[-5:]))
-                write_p = f"""# Topic: {topic}\n# Materials:\n{ai_insights}\nStructure: 1 H1, 4 H2s, PAS intros, 1500 words, tables, [Image X] placeholders.\n# Persona:\n{persona_input}"""
+                
+                write_p = f"""
+# Your Role:
+你是一个我写博客文章的枪手，你会使用我的口吻，用Markdown语言输出指定格式的博客文章。
+
+# Your Responsibilities:
+当我输入如下格式的内容给你时:
+{ai_insights}
+
+你按照如下的格式输出一篇文章给我：
+# {topic}
+
+![alt with keywords]("https://placehold.co/600x400.jpg")
+[Leading paragraph: 开头第一段，使用PAS策略，第一人称的语气。(Max 30 words)]
+**[Featured paragraph: 开头第二段，回答标题提出的问题，竞争谷歌精选摘要。(Min 30 words and Max 50 words)]**
+[Transition paragraph: 承上启下，挽留客户继续往下阅读。]
+
+LOOP START
+## 我输入给你的二级标题，也是以问号结尾
+[Leading paragraph: 开头第一段，使用PAS策略，第一人称的语气。(Max 30 words)]
+**[Featured paragraph: 开头第二段，回答标题提出的问题，竞争谷歌精选摘要。(Min 30 words and Max 50 words)]**
+![alt with keywords]("https://placehold.co/600x400.jpg")
+[Dive deeper paragraph: 根据二级标题，延展和深入，批判性思维拆分问题。(Min 200 words)]
+LOOP END
+
+## Conclusion
+写一段结论，总结全文。(Max 30 words)
+
+# My Role:
+{persona_input}
+
+# My Requirements:
+1. 文章长度不得少于1500单词，每个Dive deeper paragraph不得少于200单词。
+2. 全文除Featured paragraphs必须使用第一人称口吻，必要时补充个人故事。
+3. 在二级标题下穿插Markdown格式的H3s和表格(全文至少3个表格)。
+4. 写作风格使用Plain English和短句，让高中学生也能读懂。
+5. 替换复杂连接词，不要主动添加任何总结（除Conclusion外）。
+6. 不能包含任何解释性文本（如Leading paragraph:, LOOP START 等）。
+7. 图片占位符严格使用：![alt with keywords]("https://placehold.co/600x400.jpg")
+8. 默认英语输出，必须是Markdown格式。
+                """
                 article_md = model_pro.generate_content(write_p, safety_settings=safe_config).text
-                time.sleep(4) 
+                time.sleep(5) # 缓冲
                 
-                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🔗 注入图片 SEO 与双向脚注...")
+                # ---------------------------------------------------------
+                # 步骤 C: 高级图片 SEO 与 双向脚注系统 (分两步走以保证最高质量)
+                # ---------------------------------------------------------
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🖼️ 注入图片 SEO 标签...")
                 log_box.code("\n".join(logs[-5:]))
-                seo_p = f"Replace `[Image X]` with SEO markdown. Insert exactly 10 bidirectional footnotes. Output full markdown.\n\n{article_md}"
-                final_md = model_pro.generate_content(seo_p, safety_settings=safe_config).text
                 
-                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🌐 正在推送到 WordPress...")
+                seo_p = f"Find ALL `[Image X]` or dummy image tags in the article. Replace them with SEO Markdown: `![Alt Text (≤15 words)](#placeholder_link \"Title text (≤5 words)\")`. Output the FULL updated article in Markdown.\n\nArticle Content:\n{article_md}"
+                seo_md = model_flash.generate_content(seo_p, safety_settings=safe_config).text
+                time.sleep(3)
+                
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🔗 构建 10 个高级双向脚注系统...")
+                log_box.code("\n".join(logs[-5:]))
+                
+                fn_prompt = f"""
+## Your Role
+SEO expert enhancing articles with external links.
+## Input
+{seo_md}
+## Output Guidelines
+1. Insert exactly 10 manual bidirectional footnotes. Exclude bolded paragraphs.
+2. In main text use: `<sup>[1](#footnote-1){{#ref-1}}</sup>`
+3. At the bottom, create "## Footnotes" section with: `<span id="footnote-1">1. Short explanation. [↩︎](#ref-1)</span>`
+4. Output the FULL UPDATED ARTICLE in Markdown format.
+                """
+                final_md = model_pro.generate_content(fn_prompt, safety_settings=safe_config).text
+                time.sleep(3)
+                
+                # ---------------------------------------------------------
+                # 步骤 D: WordPress 自动排期发布
+                # ---------------------------------------------------------
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🌐 正在推送到 WordPress 排期系统...")
                 log_box.code("\n".join(logs[-5:]))
                 
                 title = topic
@@ -612,16 +891,21 @@ def tool7_batch_publish():
                 log_box.code("\n".join(logs[-5:]))
                 
                 current_schedule_time += timedelta(hours=interval_hours)
-                time.sleep(5)
+                
+                # 完成一篇后大休眠，彻底规避 429 风控
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] ⏳ 本篇处理完毕，休眠 10 秒后继续...")
+                log_box.code("\n".join(logs[-5:]))
+                time.sleep(10)
                 
             except Exception as e:
-                logs.append(f"⚠️ 发生错误跳过此篇: {e}")
+                logs.append(f"⚠️ 发生错误，已自动跳过此篇: {e}")
                 log_box.code("\n".join(logs[-5:]))
-                time.sleep(10) 
+                time.sleep(15) # 报错后多休眠一会儿
                 continue
                 
             progress_bar.progress((idx + 1) / len(topics))
-        status_box.success(f"🎉 批量任务全部执行完毕！")
+            
+        status_box.success(f"🎉 批量任务全部执行完毕！共处理 {len(topics)} 篇文章。请前往 WordPress 后台查看排期日历。")
 
 # ==========================================
 # 左侧主控导航菜单
