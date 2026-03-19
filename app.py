@@ -35,7 +35,7 @@ def get_model(model_type="flash"):
 model_flash = get_model("flash")
 model_pro = get_model("pro")
 
-# 统一的宽松安全设置，防止 B2B 工业词汇被误拦截
+# 统一宽松安全设置，防止 B2B 工业词汇被误拦截
 safe_config = [
     {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -44,7 +44,7 @@ safe_config = [
 ]
 
 # ==========================================
-# 1. 全局状态管理 (集中初始化，避免冲突)
+# 1. 全局状态管理 (严格按照工具 1-5 排序命名)
 # ==========================================
 def init_session_state():
     # --- Tool 1: 角色背景 ---
@@ -63,22 +63,22 @@ def init_session_state():
     if 't2_results' not in st.session_state: st.session_state.t2_results = []
     
     # --- Tool 3: 原材料生成 ---
-    if 't4_m_step' not in st.session_state: st.session_state.t4_m_step = 1
-    if 't4_m_topics_raw' not in st.session_state: st.session_state.t4_m_topics_raw = ""
-    if 't4_m_topics_list' not in st.session_state: st.session_state.t4_m_topics_list = []
-    if 't4_m_ai_results' not in st.session_state: st.session_state.t4_m_ai_results = {}
-    if 't4_m_personal_insights' not in st.session_state: st.session_state.t4_m_personal_insights = {}
-    if 't4_m_batch_personal' not in st.session_state: st.session_state.t4_m_batch_personal = ""
-    if 't4_m_final_materials' not in st.session_state: st.session_state.t4_m_final_materials = ""
+    if 't3_step' not in st.session_state: st.session_state.t3_step = 1
+    if 't3_topics_raw' not in st.session_state: st.session_state.t3_topics_raw = ""
+    if 't3_topics_list' not in st.session_state: st.session_state.t3_topics_list = []
+    if 't3_ai_results' not in st.session_state: st.session_state.t3_ai_results = {}
+    if 't3_personal_insights' not in st.session_state: st.session_state.t3_personal_insights = {}
+    if 't3_batch_personal' not in st.session_state: st.session_state.t3_batch_personal = ""
+    if 't3_final_materials' not in st.session_state: st.session_state.t3_final_materials = ""
     
     # --- Tool 4: 文章生成 ---
-    if 't5_article_draft' not in st.session_state: st.session_state.t5_article_draft = ""
-    if 't5_validation_res' not in st.session_state: st.session_state.t5_validation_res = ""
+    if 't4_article_draft' not in st.session_state: st.session_state.t4_article_draft = ""
+    if 't4_validation_res' not in st.session_state: st.session_state.t4_validation_res = ""
     
     # --- Tool 5: 配图与发布 ---
-    if 't6_img_prompts' not in st.session_state: st.session_state.t6_img_prompts = ""
-    if 't6_seo_markdown' not in st.session_state: st.session_state.t6_seo_markdown = ""
-    if 't6_final_markdown' not in st.session_state: st.session_state.t6_final_markdown = ""
+    if 't5_img_prompts' not in st.session_state: st.session_state.t5_img_prompts = ""
+    if 't5_seo_markdown' not in st.session_state: st.session_state.t5_seo_markdown = ""
+    if 't5_final_markdown' not in st.session_state: st.session_state.t5_final_markdown = ""
 
 init_session_state()
 
@@ -297,39 +297,39 @@ def tool3_materials():
     st.caption("把话题转化为完整的写作原材料，包含 AI 深度调研结果（Perplexity + Google SERP）和你的个人见解。")
     st.divider()
 
-    step = st.session_state.t4_m_step
+    step = st.session_state.t3_step
     st.subheader(f"第 {step} / 4 步")
 
     if step == 1:
         st.markdown("### 第 1 步：批量粘贴话题")
         default_val = "\n".join(st.session_state.t2_results[:2]) if st.session_state.t2_results else ""
-        current_val = st.text_area("请从 Excel / 工具 2 中复制话题列表粘贴到下方：", value=st.session_state.t4_m_topics_raw or default_val, height=150)
+        current_val = st.text_area("请从 Excel / 工具 2 中复制话题列表粘贴到下方：", value=st.session_state.t3_topics_raw or default_val, height=150)
         
         if st.button("下一步 ➡️ (开始 AI 调研)", type="primary"):
             if not current_val.strip(): st.error("请至少输入一个话题！")
             else:
-                st.session_state.t4_m_topics_raw = current_val
-                st.session_state.t4_m_topics_list = [t.strip() for t in current_val.split('\n') if t.strip()]
-                st.session_state.t4_m_step = 2
+                st.session_state.t3_topics_raw = current_val
+                st.session_state.t3_topics_list = [t.strip() for t in current_val.split('\n') if t.strip()]
+                st.session_state.t3_step = 2
                 st.rerun()
 
     elif step == 2:
         st.markdown("### 第 2 步：AI 见解调研")
-        topics = st.session_state.t4_m_topics_list
+        topics = st.session_state.t3_topics_list
         total = len(topics)
         
-        if len(st.session_state.t4_m_ai_results) < total:
+        if len(st.session_state.t3_ai_results) < total:
             pb = st.progress(0)
             st_txt = st.empty()
             for idx, topic in enumerate(topics):
-                if topic in st.session_state.t4_m_ai_results: continue
+                if topic in st.session_state.t3_ai_results: continue
                 st_txt.text(f"正在深度调研 ({idx+1}/{total}): {topic}")
                 prompt = f"针对话题：{topic}\n提炼出6条来自SERP的关键见解，再补充4条逻辑推理见解。同时提供4个相关的英文二级标题。\n严格按照格式：\n*二级标题：\n* [H2 1]...\n*AI见解：\n1. [见解1]..."
                 try:
                     if idx > 0: time.sleep(1.5)
-                    st.session_state.t4_m_ai_results[topic] = model_pro.generate_content(prompt, safety_settings=safe_config).text
+                    st.session_state.t3_ai_results[topic] = model_pro.generate_content(prompt, safety_settings=safe_config).text
                 except Exception as e:
-                    st.session_state.t4_m_ai_results[topic] = "调研失败。"
+                    st.session_state.t3_ai_results[topic] = "调研失败。"
                 pb.progress((idx + 1) / total)
             st_txt.success(f"✅ 调研完成 ({total}/{total})")
         else:
@@ -337,73 +337,73 @@ def tool3_materials():
 
         with st.expander("👁️ 查看 AI 调研结果"):
             for t in topics:
-                st.markdown(f"**{t}**\n{st.session_state.t4_m_ai_results.get(t, '')}")
+                st.markdown(f"**{t}**\n{st.session_state.t3_ai_results.get(t, '')}")
 
         c1, c2 = st.columns([1, 6])
         with c1:
-            if st.button("⬅️ 上一步", key="t4_m_prev2"):
-                st.session_state.t4_m_step = 1
+            if st.button("⬅️ 上一步", key="t3_prev2"):
+                st.session_state.t3_step = 1
                 st.rerun()
         with c2:
             if st.button("下一步 ➡️ (录入个人见解)", type="primary"):
-                st.session_state.t4_m_step = 3
+                st.session_state.t3_step = 3
                 st.rerun()
 
     elif step == 3:
         st.markdown("### 第 3 步：录入个人见解（选填）")
-        topics = st.session_state.t4_m_topics_list
+        topics = st.session_state.t3_topics_list
         
         mode = st.radio("录入方式：", ["逐一输入", "批量粘贴"])
         if mode == "逐一输入":
             for idx, topic in enumerate(topics):
-                if topic not in st.session_state.t4_m_personal_insights: st.session_state.t4_m_personal_insights[topic] = ""
-                st.session_state.t4_m_personal_insights[topic] = st.text_input(f"{idx+1}. {topic}", value=st.session_state.t4_m_personal_insights[topic])
+                if topic not in st.session_state.t3_personal_insights: st.session_state.t3_personal_insights[topic] = ""
+                st.session_state.t3_personal_insights[topic] = st.text_input(f"{idx+1}. {topic}", value=st.session_state.t3_personal_insights[topic], key=f"t3_in_{idx}")
         else:
-            b_input = st.text_area("批量粘贴 (每行对应一个话题)：", value=st.session_state.t4_m_batch_personal, height=150)
-            st.session_state.t4_m_batch_personal = b_input
+            b_input = st.text_area("批量粘贴 (每行对应一个话题)：", value=st.session_state.t3_batch_personal, height=150)
+            st.session_state.t3_batch_personal = b_input
             b_lines = [l.strip() for l in b_input.split('\n')]
             for idx, topic in enumerate(topics):
-                st.session_state.t4_m_personal_insights[topic] = b_lines[idx] if idx < len(b_lines) else ""
+                st.session_state.t3_personal_insights[topic] = b_lines[idx] if idx < len(b_lines) else ""
 
         c1, c2 = st.columns([1, 6])
         with c1:
-            if st.button("⬅️ 上一步", key="t4_m_prev3"):
-                st.session_state.t4_m_step = 2
+            if st.button("⬅️ 上一步", key="t3_prev3"):
+                st.session_state.t3_step = 2
                 st.rerun()
         with c2:
             if st.button("下一步 ➡️ (生成结果)", type="primary"):
-                st.session_state.t4_m_step = 4
+                st.session_state.t3_step = 4
                 st.rerun()
 
     elif step == 4:
         st.markdown("### 第 4 步：生成结果")
         out = ""
-        for t in st.session_state.t4_m_topics_list:
-            ai_r = st.session_state.t4_m_ai_results.get(t, "")
-            p_r = st.session_state.t4_m_personal_insights.get(t, "")
+        for t in st.session_state.t3_topics_list:
+            ai_r = st.session_state.t3_ai_results.get(t, "")
+            p_r = st.session_state.t3_personal_insights.get(t, "")
             out += f"*主标题：{t}\n{ai_r}\n*人工见解：{p_r}\n\n--------------------------------------------------\n\n"
         
-        st.session_state.t4_m_final_materials = out
-        st.text_area("最终原材料提取结果 (直接复制供工具5使用)：", value=out.strip(), height=400)
+        st.session_state.t3_final_materials = out
+        st.text_area("最终原材料提取结果 (直接复制供工具4使用)：", value=out.strip(), height=400)
         
         c1, c2 = st.columns([1, 6])
         with c1:
-            if st.button("⬅️ 上一步", key="t4_m_prev4"):
-                st.session_state.t4_m_step = 3
+            if st.button("⬅️ 上一步", key="t3_prev4"):
+                st.session_state.t3_step = 3
                 st.rerun()
         with c2:
             if st.button("🔄 重置此工具"):
-                st.session_state.t4_m_step = 1
-                st.session_state.t4_m_topics_raw = ""
-                st.session_state.t4_m_ai_results = {}
-                st.session_state.t4_m_personal_insights = {}
+                st.session_state.t3_step = 1
+                st.session_state.t3_topics_raw = ""
+                st.session_state.t3_ai_results = {}
+                st.session_state.t3_personal_insights = {}
                 st.rerun()
 
 # ==========================================
 # 工具 4：文章生成器
 # ==========================================
-def tool5_article():
-    st.title("✍️ 工具 5：文章生成器")
+def tool4_article():
+    st.title("✍️ 工具 4：文章生成器")
     st.caption("输入角色背景和写作原材料，AI 会为你生成一篇完整的 Markdown 格式文章。")
     st.divider()
 
@@ -411,12 +411,12 @@ def tool5_article():
     persona_input = st.text_area("角色背景 (默认读取工具1)：", value=st.session_state.persona_en, height=150)
 
     st.subheader("第 2 步：输入写作原材料")
-    mat_input = st.text_area("粘贴从工具4生成的写作原材料 (取单篇即可)：", value=st.session_state.t4_m_final_materials.split('---')[0].strip() if st.session_state.t4_m_final_materials else "", height=200)
+    mat_input = st.text_area("粘贴从工具3生成的写作原材料 (取单篇即可)：", value=st.session_state.t3_final_materials.split('---')[0].strip() if st.session_state.t3_final_materials else "", height=200)
 
     if st.button("📝 生成文章 (流式输出 约1-3分钟)", type="primary"):
         if not mat_input.strip() or not persona_input.strip(): st.error("背景和原材料不能为空！")
         else:
-            st.session_state.t5_article_draft = ""
+            st.session_state.t4_article_draft = ""
             with st.spinner("AI 正在严格执行 SOP 撰写 1500 字长文..."):
                 prompt = f"""
                 # Your Role: Write a blog article matching my tone.
@@ -453,40 +453,40 @@ def tool5_article():
                         if chunk.text:
                             txt += chunk.text
                             ph.markdown(txt + "▌")
-                    st.session_state.t5_article_draft = txt
+                    st.session_state.t4_article_draft = txt
                     st.success("✅ 文章生成完毕！")
                 except Exception as e: st.error(f"生成中断: {e}")
 
-    if st.session_state.t5_article_draft:
+    if st.session_state.t4_article_draft:
         st.subheader("第 3 步：编辑与使用")
         c1, c2, c3 = st.columns([1.5, 2, 2])
         with c1:
             if st.button("✅ 一键校验格式"):
-                d = st.session_state.t5_article_draft
-                st.session_state.t5_validation_res = f"字数: {len(d.split())} 词 | H2数量: {d.count('## ')-d.count('### ')-1} | 图片: {d.count('![')} | 表格: {d.count('|---|')}"
+                d = st.session_state.t4_article_draft
+                st.session_state.t4_validation_res = f"字数: {len(d.split())} 词 | H2数量: {d.count('## ')-d.count('### ')-1} | 图片: {d.count('![')} | 表格: {d.count('|---|')}"
         with c2: lang = st.selectbox("翻译:", ["简体中文", "Español", "Deutsch"], label_visibility="collapsed")
         with c3:
             if st.button("🌐 翻译此文"):
                 try:
-                    res = model_flash.generate_content(f"Translate to {lang}, keep markdown:\n{st.session_state.t5_article_draft}", safety_settings=safe_config)
-                    st.session_state.t5_article_draft = res.text
+                    res = model_flash.generate_content(f"Translate to {lang}, keep markdown:\n{st.session_state.t4_article_draft}", safety_settings=safe_config)
+                    st.session_state.t4_article_draft = res.text
                     st.success(f"已翻译为 {lang}")
                 except Exception as e: st.error(e)
 
-        if st.session_state.t5_validation_res: st.info(st.session_state.t5_validation_res)
+        if st.session_state.t4_validation_res: st.info(st.session_state.t4_validation_res)
         
-        st.session_state.t5_article_draft = st.text_area("Markdown 编辑器：", value=st.session_state.t5_article_draft, height=500)
+        st.session_state.t4_article_draft = st.text_area("Markdown 编辑器：", value=st.session_state.t4_article_draft, height=500)
 
 # ==========================================
 # 工具 5：文章配图 + 一键发布
 # ==========================================
-def tool6_publish():
-    st.title("🚀 工具 6：文章配图 + 一键发布")
+def tool5_publish():
+    st.title("🚀 工具 5：文章配图 + 一键发布")
     st.divider()
 
     st.subheader("第 1 步 & 第 2 步：确认素材")
     persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.persona_en, height=100)
-    md_input = st.text_area("粘贴 Markdown 文章全文 (默认读取工具5)：", value=st.session_state.t5_article_draft, height=200)
+    md_input = st.text_area("粘贴 Markdown 文章全文 (默认读取工具4)：", value=st.session_state.t4_article_draft, height=200)
 
     st.subheader("第 3 步：自动处理 (图片提示词 + SEO + 脚注)")
     c1, c2, c3 = st.columns(3)
@@ -495,28 +495,28 @@ def tool6_publish():
             if not md_input: st.error("请粘贴文章！")
             else:
                 p = f"Generate FIVE Midjourney/Recraft prompts for this article based on my persona. Format: Chinese Title followed by 70+ words English description.\nArticle:\n{md_input}\nPersona:\n{persona_input}"
-                st.session_state.t6_img_prompts = model_flash.generate_content(p, safety_settings=safe_config).text
+                st.session_state.t5_img_prompts = model_flash.generate_content(p, safety_settings=safe_config).text
                 st.success("✅ 配图 Prompt 生成完毕")
     with c2:
         if st.button("🖼️ 2. 优化图片 SEO", use_container_width=True):
             if not md_input: st.error("请粘贴文章！")
             else:
                 p = f"Replace all `[Image X]` or dummy image tags in this markdown with SEO markdown: `![Alt Text (≤15 words)](https://placehold.co/800x400.png \"Title (≤5 words)\")`. Output full markdown.\n\n{md_input}"
-                st.session_state.t6_seo_markdown = model_flash.generate_content(p, safety_settings=safe_config).text
+                st.session_state.t5_seo_markdown = model_flash.generate_content(p, safety_settings=safe_config).text
                 st.success("✅ 图片 SEO 注入完毕")
     with c3:
         if st.button("🔗 3. 注入 10 个双向脚注", use_container_width=True):
-            src = st.session_state.t6_seo_markdown or md_input
+            src = st.session_state.t5_seo_markdown or md_input
             if not src: st.error("请先完成前置步骤！")
             else:
                 p = f"Insert exactly 10 manual bidirectional footnotes (using `<sup>[1](#footnote-1){{#ref-1}}</sup>` in text and `<span id=\"footnote-1\">1. Short explanation. [↩︎](#ref-1)</span>` in a new '## Footnotes' section at the end) into this article. Output full markdown.\n\n{src}"
-                st.session_state.t6_final_markdown = model_pro.generate_content(p, safety_settings=safe_config).text
+                st.session_state.t5_final_markdown = model_pro.generate_content(p, safety_settings=safe_config).text
                 st.success("✅ 脚注系统植入完毕")
 
-    if st.session_state.t6_img_prompts:
-        with st.expander("👁️ 查看生成的配图 Prompt"): st.code(st.session_state.t6_img_prompts, language="markdown")
-    if st.session_state.t6_final_markdown or st.session_state.t6_seo_markdown:
-        st.session_state.t6_final_markdown = st.text_area("最终 Markdown (发版用)：", value=st.session_state.t6_final_markdown or st.session_state.t6_seo_markdown, height=300)
+    if st.session_state.t5_img_prompts:
+        with st.expander("👁️ 查看生成的配图 Prompt"): st.code(st.session_state.t5_img_prompts, language="markdown")
+    if st.session_state.t5_final_markdown or st.session_state.t5_seo_markdown:
+        st.session_state.t5_final_markdown = st.text_area("最终 Markdown (发版用)：", value=st.session_state.t5_final_markdown or st.session_state.t5_seo_markdown, height=300)
 
     st.subheader("第 4 步：一键发布到 WordPress")
     c1, c2, c3 = st.columns(3)
@@ -526,7 +526,7 @@ def tool6_publish():
     status = st.selectbox("状态", ["draft", "publish"])
     
     if st.button("🚀 立即推送", type="primary"):
-        final_content = st.session_state.t6_final_markdown or st.session_state.t6_seo_markdown or md_input
+        final_content = st.session_state.t5_final_markdown or st.session_state.t5_seo_markdown or md_input
         if not final_content: st.error("内容为空！")
         else:
             with st.spinner("推送中..."):
@@ -544,11 +544,11 @@ def tool6_publish():
                 except Exception as e: st.error(e)
 
 # ==========================================
-# 左侧主控导航菜单
+# 左侧主控导航菜单 (正确的路由流转)
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: 2026 最终聚合版")
+    st.caption("版本: 2026 终极版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", 
         "2. 文章话题生成器", 
@@ -559,9 +559,9 @@ with st.sidebar:
     st.markdown("---")
     st.success("✅ 模块化联通正常\n\n各工具数据已实现自动流转。")
 
-# 路由分发
+# 严格按 1到5 的路由进行页面切换
 if page.startswith("1"): tool1_persona()
 elif page.startswith("2"): tool2_topics()
-elif page.startswith("4"): tool4_materials()
-elif page.startswith("5"): tool5_article()
-elif page.startswith("6"): tool6_publish()
+elif page.startswith("3"): tool3_materials()
+elif page.startswith("4"): tool4_article()
+elif page.startswith("5"): tool5_publish()
