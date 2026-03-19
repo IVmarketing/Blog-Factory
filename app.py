@@ -62,7 +62,7 @@ def init_session_state():
     if 't2_topic_count' not in st.session_state: st.session_state.t2_topic_count = 150
     if 't2_results' not in st.session_state: st.session_state.t2_results = []
     
-    # --- Tool 4: 原材料生成 ---
+    # --- Tool 3: 原材料生成 ---
     if 't4_m_step' not in st.session_state: st.session_state.t4_m_step = 1
     if 't4_m_topics_raw' not in st.session_state: st.session_state.t4_m_topics_raw = ""
     if 't4_m_topics_list' not in st.session_state: st.session_state.t4_m_topics_list = []
@@ -71,11 +71,11 @@ def init_session_state():
     if 't4_m_batch_personal' not in st.session_state: st.session_state.t4_m_batch_personal = ""
     if 't4_m_final_materials' not in st.session_state: st.session_state.t4_m_final_materials = ""
     
-    # --- Tool 5: 文章生成 ---
+    # --- Tool 4: 文章生成 ---
     if 't5_article_draft' not in st.session_state: st.session_state.t5_article_draft = ""
     if 't5_validation_res' not in st.session_state: st.session_state.t5_validation_res = ""
     
-    # --- Tool 6: 配图与发布 ---
+    # --- Tool 5: 配图与发布 ---
     if 't6_img_prompts' not in st.session_state: st.session_state.t6_img_prompts = ""
     if 't6_seo_markdown' not in st.session_state: st.session_state.t6_seo_markdown = ""
     if 't6_final_markdown' not in st.session_state: st.session_state.t6_final_markdown = ""
@@ -290,7 +290,7 @@ def tool2_topics():
                 st.rerun()
 
 # ==========================================
-# 工具 4：写文章原材料生成
+# 工具 3：写文章原材料生成
 # ==========================================
 def tool4_materials():
     st.title("🗄️ 工具 4：写文章原材料生成")
@@ -400,7 +400,7 @@ def tool4_materials():
                 st.rerun()
 
 # ==========================================
-# 工具 5：文章生成器
+# 工具 4：文章生成器
 # ==========================================
 def tool5_article():
     st.title("✍️ 工具 5：文章生成器")
@@ -478,7 +478,7 @@ def tool5_article():
         st.session_state.t5_article_draft = st.text_area("Markdown 编辑器：", value=st.session_state.t5_article_draft, height=500)
 
 # ==========================================
-# 工具 6：文章配图 + 一键发布
+# 工具 5：文章配图 + 一键发布
 # ==========================================
 def tool6_publish():
     st.title("🚀 工具 6：文章配图 + 一键发布")
@@ -552,9 +552,9 @@ with st.sidebar:
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", 
         "2. 文章话题生成器", 
-        "4. 写文章原材料生成",
-        "5. 文章生成器",
-        "6. 文章配图 + 一键发布"
+        "3. 写文章原材料生成",
+        "4. 文章生成器",
+        "5. 文章配图 + 一键发布"
     ])
     st.markdown("---")
     st.success("✅ 模块化联通正常\n\n各工具数据已实现自动流转。")
