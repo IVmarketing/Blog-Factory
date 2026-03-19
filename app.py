@@ -505,15 +505,9 @@ LOOP END
 12. 在每个二级标题下的图片占位符之下的位置都要生成Dive deeper paragraph。
 """
                 try:
-                    # 开启流式输出
-                    res = model_pro.generate_content(prompt, stream=True, safety_settings=safe_config)
-                    ph = st.empty()
-                    txt = ""
-                    for chunk in res:
-                        if chunk.text:
-                            txt += chunk.text
-                            ph.markdown(txt + "▌")
-                    st.session_state.t4_article_draft = txt
+                    # ⚠️ 关闭流式输出 (stream=False)，完美适配第三方中转站
+                    res = model_pro.generate_content(prompt, stream=False, safety_settings=safe_config)
+                    st.session_state.t4_article_draft = res.text
                     st.success("✅ 文章生成完毕！")
                 except Exception as e: 
                     st.error(f"生成中断: {e}")
