@@ -938,7 +938,232 @@ if st.session_state.t4_article_draft:
 
 
 
+import streamlit as st
+import google.generativeai as genai
+import os
+import requests
+from requests.auth import HTTPBasicAuth
+import re
 
+# ==========================================
+# 0. 页面配置与大模型初始化
+# ==========================================
+st.set_page_config(page_title="AI Writer - 配图与一键发布", layout="wide")
+
+def get_config(key): return st.secrets.get(key) or os.getenv(key)
+api_key = get_config("GEMINI_API_KEY")
+
+if api_key: genai.configure(api_key=api_key)
+else: st.stop()
+
+@st.cache_resource
+def get_model(model_type="flash"):
+    try:
+        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        target = next((m for m in available if model_type in m), available[0])
+        return genai.GenerativeModel(target)
+    except:
+        return genai.GenerativeModel(f'models/gemini-1.5-{model_type}')
+
+model_pro = get_model("pro") # 用于处理复杂的脚注插入
+model_flash = get_model("flash") # 用于处理短文本 SEO 和配图 Prompt
+
+safe_config = [
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+]
+
+# ==========================================
+# 1. 状态管理
+# ==========================================
+if 'persona_en' not in st.session_state: st.session_state.persona_en = ""
+if 't6_markdown_input' not in st.session_state: st.session_state.t6_markdown_input = ""
+if 't6_img_prompts' not in st.session_state: st.session_state.t6_img_prompts = ""
+if 't6_seo_markdown' not in st.session_state: st.session_state.t6_seo_markdown = ""
+if 't6_final_markdown' not in st.session_state: st.session_state.t6_final_markdown = ""
+
+# ==========================================
+# 2. UI 界面 - 头部
+# ==========================================
+st.title("🚀 工具 6：文章配图 + 一键发布")
+st.markdown("""
+**配图 → SEO → 发布一条龙 | 单篇发布**
+为文章自动生成精美配图提示词，自动生成 SEO Metadata 和复杂的双向脚注外链，一键发布到 WordPress。
+""")
+st.divider()
+
+# ==========================================
+# 第 1 步：输入角色背景
+# ==========================================
+st.subheader("第 1 步：确认「我的角色背景」")
+st.caption("AI 会根据你的角色背景生成更贴合自己行业的配图提示词 [cite: 498-504]。")
+
+default_persona = st.session_state.persona_en if st.session_state.persona_en else """### About My Business
+Name: Fortis
+Products: Custom Hydraulic Motors..."""
+
+persona_input = st.text_area("角色背景 (用于配图基调)：", value=default_persona, height=100, disabled=(st.session_state.persona_en != ""))
+if not st.session_state.persona_en:
+    st.warning("⚠️ 检测到您未在工具 1 中保存背景，当前使用的是默认示例。建议您先返回工具 1 进行设置。")
+
+# ==========================================
+# 第 2 步：粘贴 Markdown 文章
+# ==========================================
+st.subheader("第 2 步：粘贴 Markdown 文章全文")
+st.caption("直接粘贴完整 Markdown（包含 H1/H2、段落、图片占位符）。系统会自动分析文章结构并为每个部分生成配图提示词 [cite: 516-519]。")
+
+md_input = st.text_area("粘贴文章全文：", value=st.session_state.t6_markdown_input, height=200, key="t6_md_input")
+
+# ==========================================
+# 第 3 步：自动化 SEO 与配图提示词生成
+# ==========================================
+st.subheader("第 3 步：自动处理 (图片提示词 + SEO + 脚注)")
+st.caption("这一步将并行处理您提供的三个核心 Prompt。")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    if st.button("🎨 1. 生成 5 张配图 Prompt", use_container_width=True):
+        if not md_input: st.error("请先粘贴文章！")
+        else:
+            with st.spinner("正在生成 Recraft 级配图提示词..."):
+                p = f"""
+                # Your Role:
+                You will generate Recraft.ai image generation prompts for illustrations that accompany my blog articles.
+                
+                # Article Content:
+                {md_input}
+                
+                # My Role:
+                {persona_input}
+                
+                # Your Responsibilities:
+                Generate FIVE image generation prompts.
+                1. Start each prompt with a concise Chinese title.
+                2. Each prompt must be at least 70 words long in English.
+                3. Include: Objects, Colors/lighting, Perspective, Artistic style (e.g., photography, 3D render).
+                """
+                try:
+                    res = model_flash.generate_content(p, safety_settings=safe_config)
+                    st.session_state.t6_img_prompts = res.text
+                    st.success("✅ 配图 Prompt 生成完毕")
+                except Exception as e: st.error(e)
+
+with col2:
+    if st.button("🖼️ 2. 优化图片 SEO (Alt & Title)", use_container_width=True):
+        if not md_input: st.error("请先粘贴文章！")
+        else:
+            with st.spinner("正在为 [Image X] 占位符注入 SEO 元数据..."):
+                p = f"""
+                # Your Role: SEO expert specializing in image SEO optimization.
+                
+                # Article Context:
+                {md_input}
+                
+                # Task:
+                Find all `[Image X]` placeholders or `![alt with keywords]("https://placehold.co/600x400.jpg")` in the article.
+                Replace them with strictly formatted SEO markdown:
+                `![Alternative text, concise image description (≤15 words)](https://placehold.co/800x400.png "Title text (≤5 words)")`
+                
+                Output the FULL updated article in Markdown.
+                """
+                try:
+                    res = model_flash.generate_content(p, safety_settings=safe_config)
+                    st.session_state.t6_seo_markdown = res.text
+                    st.success("✅ 图片 SEO 注入完毕")
+                except Exception as e: st.error(e)
+
+with col3:
+    if st.button("🔗 3. 注入 10 个高级双向脚注", use_container_width=True):
+        source_text = st.session_state.t6_seo_markdown if st.session_state.t6_seo_markdown else md_input
+        if not source_text: st.error("请先粘贴文章或完成上一步！")
+        else:
+            with st.spinner("正在分析上下文并植入双向脚注 (这需要较强逻辑，约需 30 秒)..."):
+                p = f"""
+                # Your Role: SEO expert enhancing articles with external links.
+                
+                # Input Article:
+                {source_text}
+                
+                # Output Guidelines:
+                1. Identify exactly 10 meaningful noun phrases for hyperlinking. Do not hyperlink bolded paragraphs.
+                2. Insert manual bidirectional footnotes in the text: `[Phrase](https://www.example.com) <sup>[1](#footnote-1){{#ref-1}}</sup>`
+                3. At the VERY END of the article, create a "## Footnotes" section.
+                4. Format footnotes exactly like this: `<span id="footnote-1">1. Short explanation. [↩︎](#ref-1)</span>`
+                5. Output the FULL updated article in Markdown.
+                """
+                try:
+                    res = model_pro.generate_content(p, safety_settings=safe_config)
+                    st.session_state.t6_final_markdown = res.text
+                    st.success("✅ 脚注系统植入完毕")
+                except Exception as e: st.error(e)
+
+# --- 展示处理结果 ---
+if st.session_state.t6_img_prompts:
+    with st.expander("👁️ 查看生成的配图 Prompt (用于 Midjourney / Recraft)"):
+        st.code(st.session_state.t6_img_prompts, language="markdown")
+
+if st.session_state.t6_final_markdown or st.session_state.t6_seo_markdown:
+    st.subheader("最终优化的 Markdown 文章 (含 SEO & 脚注)")
+    st.session_state.t6_final_markdown = st.text_area(
+        "您可以在发布前最后一次校对代码：", 
+        value=st.session_state.t6_final_markdown or st.session_state.t6_seo_markdown, 
+        height=400
+    )
+
+# ==========================================
+# 第 4 步：配置 WordPress → 一键发布
+# ==========================================
+st.markdown("---")
+st.subheader("第 4 步：配置 WordPress → 一键发布")
+st.info("💡 不知道应用密码在哪拿？[cite: 584-589]\n1. 打开 WP 后台 -> 用户 -> 个人资料\n2. 找到应用密码 (Application Passwords) -> 新增\n3. 复制生成的长串密码粘贴到下方。")
+
+c1, c2, c3 = st.columns(3)
+with c1: wp_url_input = st.text_input("WordPress 站点地址 (含 https://)", value=get_config("WP_URL") or "")
+with c2: wp_user_input = st.text_input("WordPress 用户名", value=get_config("WP_USER") or "")
+with c3: wp_pass_input = st.text_input("应用密码", type="password", value=get_config("WP_APP_PASSWORD") or "")
+
+publish_status = st.selectbox("发布状态", ["draft (保存为草稿)", "publish (立即公开)"])
+
+if st.button("🚀 立即推送至 WordPress", type="primary", use_container_width=True):
+    final_content = st.session_state.t6_final_markdown or st.session_state.t6_seo_markdown or md_input
+    if not final_content:
+        st.error("没有可发布的文章内容！")
+    elif not all([wp_url_input, wp_user_input, wp_pass_input]):
+        st.error("请完整填写 WordPress 的三个凭证。")
+    else:
+        with st.spinner("正在通过 REST API 推送至您的网站后台..."):
+            try:
+                endpoint = f"{wp_url_input.rstrip('/')}/wp-json/wp/v2/posts"
+                
+                # 智能提取 Markdown 首行作为 WP 标题
+                title = "AI SEO Article"
+                for line in final_content.split('\n'):
+                    if line.startswith("# "):
+                        title = line.replace("# ", "").strip()
+                        # 将正文中的 H1 删掉，避免 WP 中出现两个大标题
+                        final_content = final_content.replace(line, "", 1)
+                        break
+                        
+                data = {
+                    "title": title, 
+                    "content": final_content, 
+                    "status": publish_status.split()[0]
+                }
+                
+                r = requests.post(endpoint, json=data, auth=HTTPBasicAuth(wp_user_input, wp_pass_input))
+                if r.status_code == 201:
+                    st.balloons()
+                    link = r.json().get('link')
+                    st.success(f"🎉 成功！文章已推送至您的网站。")
+                    st.markdown(f"**[点击这里查看文章]({link})**")
+                else: 
+                    st.error(f"推送失败 ({r.status_code}): {r.text}")
+                    st.warning("⚠️ 如果您使用 SiteGround 等主机，可能被防火墙拦截，请检查后台防盗链或白名单设置 [cite: 590-592]。")
+            except Exception as e: 
+                st.error(f"连接或网络失败: {e}")
 
 
 
