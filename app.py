@@ -686,6 +686,266 @@ elif step == 4:
             
 
 
+
+
+import streamlit as st
+import google.generativeai as genai
+import os
+import time
+
+# ==========================================
+# 0. 页面配置与大模型初始化
+# ==========================================
+st.set_page_config(page_title="AI Writer - 一键生成文章", layout="wide")
+
+api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    st.error("❌ 未检测到 GEMINI_API_KEY。请配置。")
+    st.stop()
+
+# 核心写作必须使用 Pro 模型以保证逻辑深度和 1500 字长度
+@st.cache_resource
+def get_pro_model():
+    try:
+        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        target = next((m for m in available if "pro" in m), available[0])
+        return genai.GenerativeModel(target)
+    except:
+        return genai.GenerativeModel('models/gemini-1.5-pro')
+
+# 翻译和校验等轻量任务使用 Flash
+@st.cache_resource
+def get_flash_model():
+    try:
+        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        target = next((m for m in available if "flash" in m), available[0])
+        return genai.GenerativeModel(target)
+    except:
+        return genai.GenerativeModel('models/gemini-1.5-flash')
+
+model_pro = get_pro_model()
+model_flash = get_flash_model()
+
+# 彻底关闭安全限制，防止长文因 B2B 工业词汇被腰斩
+safe_config = [
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+]
+
+# ==========================================
+# 1. 状态管理
+# ==========================================
+if 'persona_en' not in st.session_state: st.session_state.persona_en = ""
+if 't4_raw_materials' not in st.session_state: st.session_state.t4_raw_materials = ""
+if 't4_article_draft' not in st.session_state: st.session_state.t4_article_draft = ""
+if 't4_validation_res' not in st.session_state: st.session_state.t4_validation_res = ""
+
+# ==========================================
+# 2. UI 界面 - 头部
+# ==========================================
+st.title("✍️ 文章生成器 (一键生成 Markdown)")
+st.markdown("""
+**单篇发布 | 融合背景与素材**
+输入角色背景和写作原材料，AI 会为你生成一篇完整的 Markdown 格式文章。支持在线编辑、格式校验和多语言翻译 [cite: 90-97]。
+""")
+st.divider()
+
+# ==========================================
+# 第 1 步：输入角色背景
+# ==========================================
+st.subheader("第 1 步：输入角色背景")
+st.caption("AI 会根据角色背景来定制文章的风格和内容 [cite: 207-208]。")
+
+# 如果之前工具1没有保存背景，提供默认的 Fortis 样本供测试
+default_persona = st.session_state.persona_en if st.session_state.persona_en else """### About My Business
+Name: Fortis
+Email: sales@fortissystemsgroup.com
+Website: www.fortissystemsgroup.com
+Brand Name: Fortis
+Country: USA
+Products: Custom Hydraulic Motors
+Business Model: B2B international export trade...
+(请在此处粘贴您完整的业务和客户背景)"""
+
+persona_input = st.text_area("粘贴或编辑「我的角色背景」：", value=default_persona, height=150, key="t4_persona")
+
+# ==========================================
+# 第 2 步：输入写作原材料
+# ==========================================
+st.subheader("第 2 步：输入写作原材料")
+st.caption("把从上一个工具生成的原材料粘贴进来，建议包含：主标题、4 个二级标题、AI 见解、个人见解 [cite: 209-210]。")
+
+default_materials = """*主标题：What are the three main types of hydraulic motors?
+*二级标题：
+* What is the hydraulic motor?
+* How to size a hydraulic motor?
+* Why do hydraulic motors fail?
+* What is the most common hydraulic motor?
+*AI见解：There are three major types of hydraulic motors: gear motors, piston motors, and vane motors...
+*人工见解：齿轮马达，柱塞马达，风扇马达"""
+
+materials_input = st.text_area("粘贴写作原材料：", value=st.session_state.t4_raw_materials or default_materials, height=200, key="t4_materials")
+
+# --- 核心动作：生成文章 ---
+if st.button("📝 生成文章 (约需 1~3 分钟)", type="primary", key="t4_gen_btn"):
+    if not materials_input.strip():
+        st.error("请粘贴写作原材料！")
+    else:
+        st.session_state.t4_raw_materials = materials_input
+        st.session_state.t4_article_draft = ""
+        st.session_state.t4_validation_res = ""
+        
+        with st.spinner("AI 正在严格执行 SOP 撰写 1500 字深度长文，请稍候..."):
+            # ==========================================
+            # 💡 核心 Prompt 组装 (完全对齐你的指令要求)
+            # ==========================================
+            prompt = f"""
+            # Your Role:
+            你是一个我写博客文章的枪手，你会使用我的口吻，用Markdown语言输出指定格式的博客文章。
+
+            # Your Responsibilities:
+            当我输入如下格式的内容给你时:
+            {materials_input}
+
+            你按照如下的格式输出一篇文章给我：
+
+            # [这里是文章的主标题，以问号结尾]
+
+            ![alt with keywords]("https://placehold.co/600x400.jpg")
+
+            [开头第一段，会使用PAS策略，吸引读者注意力，在这一段里使用第一人称的语气。(Max 30 words)]
+
+            **[开头第二段，回答标题提出的问题，这个段落，后面会用来竞争谷歌的精选摘要。(Min 30 words and Max 50 words)]**
+
+            [承上启下的段落，会挽留客户继续往下阅读。]
+
+            ## [二级标题1，以问号结尾]
+
+            [开头第一段，会使用PAS策略，吸引读者注意力，在这一段里使用第一人称的语气。(Max 30 words)]
+
+            **[开头第二段，回答标题提出的问题，这个段落，后面会用来竞争谷歌的精选摘要。(Min 30 words and Max 50 words)]**
+
+            ![alt with keywords]("https://placehold.co/600x400.jpg")
+
+            [Dive deeper paragraph: 根据二级标题，继续延展和深入，可以用批判性思维，来拆分问题，帮助读者更加深入地理解。(Min 200 words)]
+            
+            (请对剩下的 3 个二级标题重复上述 H2 结构)
+
+            ## Conclusion
+
+            [写一段结论，总结全文。(Max 30 words)]
+
+            # My Role:
+            {persona_input}
+
+            # My Requirements:
+            1. 文章的长度，不得少于1500个单词，文章的每个Dive deeper paragraph，都不得少于200个单词；
+            2. 全文除了所有的Featured paragraphs必须使用第一人称的口吻进行写作，在必要时补充个人故事；
+            3. 在二级标题之下的段落中，当进行Dive deeper paragraph写作时，多穿插一些必要的Markdown格式的H3s和表格；
+            4. 写作风格介于书面学术写作和口语描述之间，所有句子都有主语，使用Plain English和简单词汇，让高中学生也能读懂，不要用复杂的长难句，尽可能用短句输出；
+            5. 将所有句子中过渡词和连接词替换成最基础，最常用的词语。保证句子的逻辑关系清晰，不要主动添加任何总结（除非文章最后的Conclusion部分）；
+            6. 你输出给我的内容不能包含任何Leading paragraph:、Featured paragraph:、Transition paragraph:、Dive deeper paragraph:、LOOP START、LOOP END这些或类似于这些的解释性文本；
+            7. 图片占位符用以下链接表示：![alt with keywords]("https://placehold.co/600x400.jpg")
+            8. 文章默认使用英语输出；
+            9. 你输出给我的文章，必须转换成Markdown格式；
+            10. 你输出给我的内容，必须包含至少3个表格；
+            11. 在每个二级标题下的Featured paragraph下边的位置生成图片占位符；
+            12. 在每个二级标题下的图片占位符之下的位置都要生成Dive deeper paragraph。
+            """
+            
+            try:
+                # 开启流式输出 (打字机效果) 避免 UI 假死
+                response = model_pro.generate_content(prompt, stream=True, safety_settings=safe_config)
+                placeholder = st.empty()
+                full_text = ""
+                for chunk in response:
+                    if chunk.text:
+                        full_text += chunk.text
+                        placeholder.markdown(full_text + "▌")
+                st.session_state.t4_article_draft = full_text
+                st.success("✅ 文章生成完毕！")
+            except Exception as e:
+                st.error(f"文章生成中断: {e}")
+
+# ==========================================
+# 第 3 步：编辑与使用
+# ==========================================
+if st.session_state.t4_article_draft:
+    st.markdown("---")
+    st.subheader("第 3 步：编辑与使用 [cite: 211]")
+    st.caption("生成的文章可以在线编辑修改。生成后建议先用「校验」功能检查格式 。")
+    
+    # 顶部工具栏
+    col1, col2, col3 = st.columns([1.5, 2, 2])
+    
+    with col1:
+        # 校验功能
+        if st.button("✅ 一键校验格式", key="t4_validate_btn"):
+            draft = st.session_state.t4_article_draft
+            words = len(draft.split())
+            h2_count = draft.count("## ") - draft.count("### ") - (1 if "## Conclusion" in draft else 0)
+            img_count = draft.count("![")
+            table_count = draft.count("|---|")
+            
+            val_text = f"""
+            **校验结果：**
+            - **字数统计**: 约 {words} 词 (目标: >1500)
+            - **H2 数量**: {h2_count} 个 (目标: 4)
+            - **图片占位符**: {img_count} 个 (目标: 5)
+            - **Markdown表格**: {table_count} 个 (目标: ≥3)
+            """
+            st.session_state.t4_validation_res = val_text
+            
+    with col2:
+        # 翻译功能 [cite: 478-490]
+        lang_options = ["简体中文", "繁体中文", "日本語", "한국어", "Español", "Deutsch", "Français", "Português", "Italiano", "Русский", "Tiếng Việt", "العربية"]
+        target_lang = st.selectbox("选择翻译语言 (不扣费)：", lang_options, label_visibility="collapsed")
+    with col3:
+        if st.button("🌐 开始翻译", key="t4_translate_btn"):
+            with st.spinner(f"正在翻译为 {target_lang}..."):
+                try:
+                    p = f"Translate the following Markdown article into {target_lang}. Keep all the Markdown formatting (like #, ##, tables, and image links) intact:\n\n{st.session_state.t4_article_draft}"
+                    res = model_flash.generate_content(p, safety_settings=safe_config)
+                    st.session_state.t4_article_draft = res.text # 覆盖原草稿
+                    st.success(f"✅ 已翻译为 {target_lang}")
+                except Exception as e: st.error(e)
+
+    # 显示校验结果
+    if st.session_state.t4_validation_res:
+        st.info(st.session_state.t4_validation_res)
+
+    # 核心编辑器
+    word_count = len(st.session_state.t4_article_draft.split())
+    st.markdown(f"**Word count: {word_count}** [cite: 244]")
+    
+    st.session_state.t4_article_draft = st.text_area(
+        "Markdown 编辑器：", 
+        value=st.session_state.t4_article_draft, 
+        height=600, 
+        key="t4_editor"
+    )
+    
+    # 预览与复制区
+    with st.expander("👁️ 预览网页渲染效果 / 复制内容"):
+        st.markdown(st.session_state.t4_article_draft, unsafe_allow_html=True)
+        st.code(st.session_state.t4_article_draft, language="markdown")
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ==========================================
 # 工具 1：创建【我的角色背景】
 # ==========================================
