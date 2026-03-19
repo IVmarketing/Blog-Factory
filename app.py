@@ -292,8 +292,8 @@ def tool2_topics():
 # ==========================================
 # 工具 3：写文章原材料生成
 # ==========================================
-def tool4_materials():
-    st.title("🗄️ 工具 4：写文章原材料生成")
+def tool3_materials():
+    st.title("🗄️ 工具 3：写文章原材料生成")
     st.caption("把话题转化为完整的写作原材料，包含 AI 深度调研结果（Perplexity + Google SERP）和你的个人见解。")
     st.divider()
 
