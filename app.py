@@ -1223,19 +1223,36 @@ Article to process:
                 """
                 final_md = model_flash.generate_content(fn_prompt, safety_settings=None).text
                 
-                # 步骤 D: WP 自动排期发布
+                # ==================================
+                # 步骤 D: WP 自动排期发布 (脱壳核心)
+                # ==================================
                 logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🌐 推送到 WordPress 排期...")
                 log_box.code("\n".join(logs[-5:]))
                 
                 title = topic
-                for line in final_md.split('\n'):
+                
+                # 💡核心修复：暴力清洗 Markdown 外壳，防止前端将图文渲染成代码块
+                raw_content = final_md.strip()
+                if raw_content.startswith('```markdown'):
+                    raw_content = raw_content[11:].strip()
+                elif raw_content.startswith('```md'):
+                    raw_content = raw_content[5:].strip()
+                elif raw_content.startswith('```'):
+                    raw_content = raw_content[3:].strip()
+                    
+                if raw_content.endswith('```'):
+                    raw_content = raw_content[:-3].strip()
+
+                final_md_clean = raw_content
+                
+                for line in final_md_clean.split('\n'):
                     if line.startswith("# "):
                         title = line.replace("# ", "").strip()
-                        final_md = final_md.replace(line, "", 1) 
+                        final_md_clean = final_md_clean.replace(line, "", 1) 
                         break
                         
                 schedule_iso = current_schedule_time.strftime("%Y-%m-%dT%H:%M:%S")
-                wp_data = {"title": title, "content": final_md, "status": "future", "date": schedule_iso}
+                wp_data = {"title": title, "content": final_md_clean, "status": "future", "date": schedule_iso}
                 r = requests.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=wp_data, auth=HTTPBasicAuth(w_user, w_pass))
                 
                 if r.status_code == 201: logs.append(f"✅ 成功！已排期至 {schedule_iso}")
