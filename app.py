@@ -767,26 +767,34 @@ Article to process:
 
 
 
+import json
+import time
+import requests
+from requests.auth import HTTPBasicAuth
+from datetime import datetime, timedelta
+import streamlit as st
+
 # ==========================================
-# 工具 7：全自动批量发布工具 (搭载顶级 SEO 提示词)
+# 工具 7：全自动批量发布工具 (100% 严格原生提示词 + 真图上传版)
 # ==========================================
 def tool7_batch_publish():
-    st.title("🤖 工具 7：全自动批量发布与排期 (无人值守)")
-    st.markdown("**🔥 终极效率工具**：搭载顶级 PAS 模型与双向脚注系统，全自动批量处理：**调研 → 写长文 → SEO/脚注 → WP排期发布**。")
+    st.title("🤖 工具 7：全自动批量发布与排期 (满血顶配版)")
+    st.markdown("**🔥 终极效率工具**：搭载 100% 满血原生 SEO 提示词，全自动执行调研、长文、Recraft真图生成、WP图库上传、图片 SEO 与双向脚注系统。")
     st.divider()
 
     col1, col2 = st.columns([1, 1])
     with col1:
         st.subheader("1. 基础素材配置")
-        persona_input = st.text_area("角色背景 (必填，将自动注入到每篇文章的设定中)：", value=st.session_state.persona_en, height=150)
-        default_topics = "\n".join(st.session_state.t2_results) if st.session_state.t2_results else ""
-        topics_input = st.text_area("粘贴批量话题 (每行一个，建议一次 10-50 个)：", value=default_topics, height=200)
+        persona_input = st.text_area("角色背景 (必填)：", value=st.session_state.get('persona_en', ''), height=150)
+        default_topics = "\n".join(st.session_state.get('t2_results', [])) if st.session_state.get('t2_results') else ""
+        topics_input = st.text_area("粘贴批量话题 (每行一个，建议一次 5-20 个)：", value=default_topics, height=200)
 
     with col2:
-        st.subheader("2. WordPress 与排期配置")
+        st.subheader("2. API 与 WordPress 配置")
         w_url = st.text_input("WP URL (含 https://)", value=get_config("WP_URL") or "", key="w_url_7")
         w_user = st.text_input("WP 用户名", value=get_config("WP_USER") or "", key="w_user_7")
         w_pass = st.text_input("WP 应用密码", type="password", value=get_config("WP_APP_PASSWORD") or "", key="w_pass_7")
+        recraft_key = st.text_input("Recraft API Key", type="password", value=get_config("RECRAFT_API_KEY") or "", key="rc_key_7")
         
         st.markdown("---")
         start_date = st.date_input("排期开始日期", value=datetime.today())
@@ -796,11 +804,11 @@ def tool7_batch_publish():
     
     if st.button("🚀 确认无误，开始全自动批量执行", type="primary", use_container_width=True):
         topics = [t.strip() for t in topics_input.split('\n') if t.strip()]
-        if not topics or not persona_input or not all([w_url, w_user, w_pass]):
-            st.error("⚠️ 请确保填完了话题、背景以及 WordPress 的三个凭证！")
+        if not topics or not persona_input or not all([w_url, w_user, w_pass, recraft_key]):
+            st.error("⚠️ 请确保填完了话题、背景、WordPress 凭证 以及 Recraft Key！")
             return
             
-        st.success(f"初始化成功！共检测到 {len(topics)} 个任务。系统已加载顶级 Prompt 引擎，即将开始无人值守作业...")
+        st.success(f"初始化成功！共检测到 {len(topics)} 个任务。即将开始包含【自动画图与上传】的无人值守作业...")
         
         progress_bar = st.progress(0)
         status_box = st.empty()
@@ -810,13 +818,16 @@ def tool7_batch_publish():
         interval_hours = 24 / posts_per_day
         current_schedule_time = datetime.combine(start_date, datetime.min.time()) + timedelta(hours=8)
         
+        # 强制关闭安全限制（适配第三方中转API）
+        local_safe_config = None 
+        
         for idx, topic in enumerate(topics):
             status_box.info(f"🔄 **正在处理第 {idx+1}/{len(topics)} 篇**: {topic}")
             try:
-                # ---------------------------------------------------------
-                # 步骤 A: 顶级深度调研 (10条见解 + 4个H2)
-                # ---------------------------------------------------------
-                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🔍 开始基于 SERP 进行深度调研...")
+                # ========================================================
+                # 步骤 A: 调研 (严格执行工具 3 提示词)
+                # ========================================================
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🔍 开始深度调研...")
                 log_box.code("\n".join(logs[-5:]))
                 
                 research_p = f"""
@@ -832,6 +843,7 @@ def tool7_batch_publish():
 
 ---
 【系统排版要求】：为了衔接下一个写作工具，请在输出上述 10 条见解的同时，顺便提供 4 个相关的英文二级标题 (H2)。并严格按照以下固定格式输出（必须保留前面的星号标签）：
+
 *二级标题：
 * [H2 1]
 * [H2 2]
@@ -839,16 +851,17 @@ def tool7_batch_publish():
 * [H2 4]
 *AI见解：
 1. [见解 1]
+2. [见解 2]
 ...
 10. [见解 10]
                 """
-                ai_insights = model_pro.generate_content(research_p, safety_settings=safe_config).text
-                time.sleep(4) # 缓冲
+                ai_insights = model_pro.generate_content(research_p, safety_settings=local_safe_config).text
+                time.sleep(3)
                 
-                # ---------------------------------------------------------
-                # 步骤 B: 顶级 1500 字 PAS 结构长文
-                # ---------------------------------------------------------
-                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] ✍️ 开始执行 PAS 结构撰写 1500 字深度长文...")
+                # ========================================================
+                # 步骤 B: PAS 1500 字长文 (严格执行工具 4 提示词)
+                # ========================================================
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] ✍️ 撰写 1500 字长文...")
                 log_box.code("\n".join(logs[-5:]))
                 
                 write_p = f"""
@@ -860,71 +873,288 @@ def tool7_batch_publish():
 {ai_insights}
 
 你按照如下的格式输出一篇文章给我：
-# {topic}
 
-![alt with keywords]("https://placehold.co/600x400.jpg")
-[Leading paragraph: 开头第一段，使用PAS策略，第一人称的语气。(Max 30 words)]
-**[Featured paragraph: 开头第二段，回答标题提出的问题，竞争谷歌精选摘要。(Min 30 words and Max 50 words)]**
-[Transition paragraph: 承上启下，挽留客户继续往下阅读。]
+# 这里是文章的主标题，以问号结尾
+
+[图片占位符]
+
+Leading paragraph:
+开头第一段，会使用PAS策略，吸引读者注意力，在这一段里使用第一人称的语气。(Max 30 words)
+
+Featured paragraph:
+**开头第二段，回答标题提出的问题，这个段落，后面会用来竞争谷歌的精选摘要。** (Min 30 words and Max 50 words)
+
+Transition paragraph:
+承上启下的段落，会挽留客户继续往下阅读。
 
 LOOP START
+
 ## 我输入给你的二级标题，也是以问号结尾
-[Leading paragraph: 开头第一段，使用PAS策略，第一人称的语气。(Max 30 words)]
-**[Featured paragraph: 开头第二段，回答标题提出的问题，竞争谷歌精选摘要。(Min 30 words and Max 50 words)]**
-![alt with keywords]("https://placehold.co/600x400.jpg")
-[Dive deeper paragraph: 根据二级标题，延展和深入，批判性思维拆分问题。(Min 200 words)]
+
+Leading paragraph:
+开头第一段，会使用PAS策略，吸引读者注意力，在这一段里使用第一人称的语气。(Max 30 words)
+
+Featured paragraph:
+**开头第二段，回答标题提出的问题，这个段落，后面会用来竞争谷歌的精选摘要。** (Min 30 words and Max 50 words)
+
+[图片占位符]
+
+Dive deeper paragraph:
+根据二级标题，继续延展和深入，可以用批判性思维，来拆分问题，帮助读者更加深入地理解。(Min 200 words)
+
 LOOP END
 
 ## Conclusion
+
 写一段结论，总结全文。(Max 30 words)
 
-# My Role:
+## My Role:
 {persona_input}
 
 # My Requirements:
-1. 文章长度不得少于1500单词，每个Dive deeper paragraph不得少于200单词。
-2. 全文除Featured paragraphs必须使用第一人称口吻，必要时补充个人故事。
-3. 在二级标题下穿插Markdown格式的H3s和表格(全文至少3个表格)。
-4. 写作风格使用Plain English和短句，让高中学生也能读懂。
-5. 替换复杂连接词，不要主动添加任何总结（除Conclusion外）。
-6. 不能包含任何解释性文本（如Leading paragraph:, LOOP START 等）。
-7. 图片占位符严格使用：![alt with keywords]("https://placehold.co/600x400.jpg")
-8. 默认英语输出，必须是Markdown格式。
+1. 文章的长度，不得少于1500个单词，文章的每个Dive deeper paragraph，都不得少于200个单词；
+2. 全文除了所有的Featured paragraphs必须使用第一人称的口吻进行写作，在必要时补充个人故事（我会稍后替换）；
+3. 在二级标题之下的段落中，当进行Dive deeper paragraph写作时，多穿插一些必要的Markdown格式的H3s和表格；
+4. 写作风格介于书面学术写作和口语描述之间，所有句子都有主语，使用Plain English和简单词汇，让高中学生也能读懂，不要用复杂的长难句，不要用复杂、高级、生僻的词汇，尽可能用短句输出，替换掉非日常的词汇；
+5. 将所有句子中过渡词和连接词替换成最基础，最常用的词语，尽可能试试简单的、直接的表达方式，避免使用复杂或生僻的词汇。保证句子的逻辑关系清晰，不要主动添加任何总结（除非文章最后的Conslusion部分）；
+6. 你输出给我的内容不能包含任何Leading paragraph:、Featured paragraph:、Transition paragraph:、Dive deeper paragraph:
+、LOOP START、LOOP END这些或类似于这些的解释性文本；
+7. 图片占位符用以下链接表示：![alt with keywords]("https://placehold.co/600x400.jpg")
+8. 文章默认使用英语输出；
+9. 你输出给我的文章，必须转换成Markdown格式；
+10. 你输出给我的内容，必须包含3个表格。
+11. 在每个二级标题下的Featured paragraph下边的位置生成图片占位符。
+12. 在每个二级标题下的图片占位符之下的位置都要生成Dive deeper paragraph。
                 """
-                article_md = model_pro.generate_content(write_p, safety_settings=safe_config).text
-                time.sleep(5) # 缓冲
+                article_md = model_pro.generate_content(write_p, safety_settings=local_safe_config).text
+                time.sleep(4)
                 
-                # ---------------------------------------------------------
-                # 步骤 C: 高级图片 SEO 与 双向脚注系统 (分两步走以保证最高质量)
-                # ---------------------------------------------------------
-                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🖼️ 注入图片 SEO 标签...")
+                # ========================================================
+                # 步骤 C1: 提取 Recraft 提示词并画图上传 (严格执行画图提示词)
+                # ========================================================
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🎨 提取 Recraft 提示词并开始云端作图...")
                 log_box.code("\n".join(logs[-5:]))
                 
-                seo_p = f"Find ALL `[Image X]` or dummy image tags in the article. Replace them with SEO Markdown: `![Alt Text (≤15 words)](#placeholder_link \"Title text (≤5 words)\")`. Output the FULL updated article in Markdown.\n\nArticle Content:\n{article_md}"
-                seo_md = model_flash.generate_content(seo_p, safety_settings=safe_config).text
-                time.sleep(3)
+                img_prompt_req = f"""
+Your Role:
+
+You will generate Recraft.ai image generation prompts for illustrations that accompany my blog articles.
+
+Your Responsibilities:
+
+When I provide you with the content of a blog article, you must generate five image generation prompts that accurately match the meaning or scenario described in the input.
+
+Each prompt must follow these guidelines:
+1. Start each prompt with a concise Chinese title that summarizes the scene depicted. Ensure the title is clearly separated from the prompt text and does not mix with it.
+2. Each prompt must be at least 70 words long and written in clear, specific English. Avoid vague descriptions.
+3. Each prompt should provide a detailed description of the image, including:
+• Objects, people, and scene elements
+• Colors, lighting, and atmosphere
+• Perspective (e.g., close-up shot, wide-angle, aerial view, etc.)
+• Possible artistic style (e.g., photography, 3D render, digital illustration, etc.)
+
+## My Role:
+{persona_input}
+
+My Requirements (Output Guidelines)
+1. All prompts must be written in English.
+2. Each prompt must be at least 70 words long.
+3. Each prompt must begin with a Chinese title summarizing the scene, ensuring it is distinct from the prompt itself.
+4. The prompts must be precise and vivid, aligned with my industry background. Avoid vague or generic descriptions.
+
+[SYSTEM CRITICAL INSTRUCTION]: For the Python script to process this automatically, you MUST output the final result strictly as a valid JSON array containing exactly 5 strings. Do not include any markdown formatting like ```json.
+Example: ["Title 1 prompt...", "Title 2 prompt...", "Title 3 prompt...", "Title 4 prompt...", "Title 5 prompt..."]
+
+Article Content:
+{article_md}
+                """
+                res = model_flash.generate_content(img_prompt_req, safety_settings=local_safe_config).text
                 
-                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🔗 构建 10 个高级双向脚注系统...")
+                # 解析 JSON 拿到 5 个 prompt
+                json_str = res.replace('```json', '').replace('```', '').strip()
+                try:
+                    img_prompts_list = json.loads(json_str)
+                except Exception:
+                    # 容错机制
+                    img_prompts_list = [f"Illustration for {topic} part {i+1}, highly detailed, industrial setting" for i in range(5)]
+
+                wp_urls = []
+                for i, p_text in enumerate(img_prompts_list[:5]): 
+                    try:
+                        # 1. 调用 Recraft 出图
+                        r_url = "[https://external.api.recraft.ai/v1/images/generations](https://external.api.recraft.ai/v1/images/generations)"
+                        r_head = {"Authorization": f"Bearer {recraft_key}", "Content-Type": "application/json"}
+                        r_data = {"prompt": p_text, "style": "realistic_image"} 
+                        r_resp = requests.post(r_url, json=r_data, headers=r_head)
+                        if r_resp.status_code != 200: raise Exception(f"Recraft failed")
+                        img_url = r_resp.json()['data'][0]['url']
+                        
+                        # 2. 下载并上传至 WP
+                        img_bytes = requests.get(img_url).content
+                        wp_media_url = f"{w_url.rstrip('/')}/wp-json/wp/v2/media"
+                        wp_head = {
+                            "Content-Disposition": f"attachment; filename=auto-img-{i+1}-{int(time.time())}.jpg", 
+                            "Content-Type": "image/jpeg"
+                        }
+                        w_resp = requests.post(wp_media_url, headers=wp_head, data=img_bytes, auth=HTTPBasicAuth(w_user, w_pass))
+                        if w_resp.status_code == 201:
+                            wp_urls.append(w_resp.json().get('source_url'))
+                        else:
+                            raise Exception("WP Media Upload failed")
+                    except Exception as e:
+                        wp_urls.append("[https://placehold.co/800x400.png?text=Image+Upload+Error](https://placehold.co/800x400.png?text=Image+Upload+Error)") # 兜底假图
+                        
+                # ========================================================
+                # 步骤 C2: 使用真实链接进行图片 SEO (严格执行图片 SEO 提示词)
+                # ========================================================
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🖼️ 将真实图片注入文章并执行 SEO...")
+                log_box.code("\n".join(logs[-5:]))
+                
+                seo_prompt = f"""
+Your Role:
+
+You are an SEO expert specializing in image SEO optimization to enhance search engine visibility for my website.
+
+Your Responsibilities:
+
+Each time I upload one or multiple images, you must generate SEO-optimized metadata for each image in the following Markdown format:
+
+![Alternative text, concise image description (≤15 words)](#placeholder_link "Title text (≤5 words)")
+
+Key Formatting Rules:
+1. Alternative Text (Alt Text):
+• Describe the image concisely in 15 words or fewer.
+• Make it descriptive and meaningful for both SEO and accessibility.
+2. Title Text:
+• Keep it 5 words or fewer.
+• It should be a short, catchy phrase that enhances the image’s SEO relevance.
+3. Markdown Code Block:
+• The output must always be formatted as a code block (```markdown) for easy copy-pasting.
+• Each image’s metadata must be presented on a separate line.
+
+My Requirements (Output Guidelines)
+1. All outputs must be in English.
+2. Replace all dummy `[Image X]` placeholders or `![alt with keywords]("https://placehold.co/600x400.jpg")` in the article with the REAL WordPress URLs provided below, formatted with the exact SEO Markdown structure requested above.
+3. OUTPUT THE FULL UPDATED MARKDOWN ARTICLE. Do not output code blocks around the article text, just the text itself.
+4. Ensure descriptions are relevant to my industry and improve SEO rankings for my website.
+
+REAL WordPress URLs to use sequentially:
+1. {wp_urls[0] if len(wp_urls) > 0 else 'https://placehold.co/600'}
+2. {wp_urls[1] if len(wp_urls) > 1 else 'https://placehold.co/600'}
+3. {wp_urls[2] if len(wp_urls) > 2 else 'https://placehold.co/600'}
+4. {wp_urls[3] if len(wp_urls) > 3 else 'https://placehold.co/600'}
+5. {wp_urls[4] if len(wp_urls) > 4 else 'https://placehold.co/600'}
+
+Article Content:
+{article_md}
+                """
+                seo_md = model_flash.generate_content(seo_prompt, safety_settings=local_safe_config).text
+                time.sleep(3)
+
+                # ========================================================
+                # 步骤 C3: 双向脚注系统 (严格执行完整脚注提示词)
+                # ========================================================
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🔗 构建 10 个双向脚注系统...")
                 log_box.code("\n".join(logs[-5:]))
                 
                 fn_prompt = f"""
 ## Your Role
-SEO expert enhancing articles with external links.
-## Input
+
+You are an SEO expert responsible for enhancing articles by inserting relevant external links while maintaining readability, proper formatting, and structured footnotes in Markdown format.
+
+## Your Responsibilities
+
+### Input
+
+You will receive an article in Markdown format.
+
+### Output Guidelines
+
+1. **Identify Key Phrases for Hyperlinking**
+
+   * Select meaningful noun phrases that require additional explanation or supporting data.
+   * Do not hyperlink single words; instead, choose context-rich phrases that fit naturally within the content.
+   * Exclude bolded paragraphs from hyperlinking.
+
+2. **Insert Hyperlinks Correctly**
+
+   * Embed links directly within the content using Markdown format (e.g., `[ISO 9001](https://www.example.com)`).
+   * Avoid adding separate footnotes within bolded paragraphs.
+   * Display the footnote number as an **upward superscript digit** using `<sup>` (e.g., `[ISO 9001](https://www.example.com) <sup>[1](#footnote-1){{#ref-1}}</sup>`).
+
+3. **Ensure Proper Footnote Usage**
+
+   * Do **not** use Markdown Extra’s `[^1]` syntax. Instead, implement a **manual bidirectional system**:
+
+     * In the main text: `<sup>[1](#footnote-1){{#ref-1}}</sup>`
+     * In the footnotes: `<span id="footnote-1">1. Short explanation. [↩︎](#ref-1)</span>`
+   * At the bottom of the article, create a **“Footnotes”** section listing all referenced links.
+   * Each footnote should include a concise explanation (max 20 words) of why users should visit the link.
+   * After each footnote entry, add a **return link `[↩︎]`** that navigates back to the corresponding keyword in the main text.
+   * Each footnote number must be unique and non-repetitive to ensure accurate linking.
+
+4. **Maintain Consistency and Readability**
+
+   * Each article must contain **exactly ten external links** — no more, no less.
+   * No duplicate key phrases should be hyperlinked.
+   * The selected phrases should be seamlessly integrated within the article to maintain smooth readability.
+
+5. **Ensure Markdown Formatting for Output**
+
+   * The final output must be in **Markdown format** after inserting hyperlinks and footnotes.
+   * You may use minimal HTML tags (`<sup>`, `<span>`) to enable superscripts and anchor navigation.
+   * Avoid unnecessary HTML to ensure compatibility across Markdown-based platforms.
+   * OUTPUT THE FULL UPDATED MARKDOWN ARTICLE. Do not output code blocks around the article text, just the text itself.
+
+---
+
+## Example Formatting
+
+✅ Correct:
+
+```markdown
+Certifications such as [ISO 9001](https://www.example.com) <sup>[1](#footnote-1){{#ref-1}}</sup> demonstrate a supplier’s commitment to quality management.
+```
+
+❌ Incorrect:
+
+```markdown
+Certifications such as [ISO 9001](https://www.example.com) [^1] demonstrate a supplier’s commitment to quality management.
+```
+
+---
+
+## Footnotes Formatting
+
+At the end of the article, include a **Footnotes** section listing all 10 inserted links along with a short explanation and return link.
+
+✅ Markdown Example:
+
+```markdown
+---
+## Footnotes  
+
+<span id="footnote-1">1. Learn how ISO 9001 ensures consistent quality standards. [↩︎](#ref-1)</span>  
+<span id="footnote-2">2. Guide to analyzing customer reviews for supplier reliability. [↩︎](#ref-2)</span>  
+<span id="footnote-3">3. Role of third-party verification in supplier compliance. [↩︎](#ref-3)</span>  
+<span id="footnote-4">4. Insights into cost-effective logistics for supply chains. [↩︎](#ref-4)</span>  
+<span id="footnote-5">5. How trade policies affect procurement strategies. [↩︎](#ref-5)</span>  
+<span id="footnote-6">6. Explanation of sustainable sourcing practices. [↩︎](#ref-6)</span>  
+<span id="footnote-7">7. Impact of digital tools on supplier evaluation. [↩︎](#ref-7)</span>  
+<span id="footnote-8">8. Why supplier diversity strengthens global supply chains. [↩︎](#ref-8)</span>  
+<span id="footnote-9">9. Benefits of certifications for international trade compliance. [↩︎](#ref-9)</span>  
+<span id="footnote-10">10. Key trends in supplier risk management. [↩︎](#ref-10)</span>  
+```
+
+Article to process:
 {seo_md}
-## Output Guidelines
-1. Insert exactly 10 manual bidirectional footnotes. Exclude bolded paragraphs.
-2. In main text use: `<sup>[1](#footnote-1){{#ref-1}}</sup>`
-3. At the bottom, create "## Footnotes" section with: `<span id="footnote-1">1. Short explanation. [↩︎](#ref-1)</span>`
-4. Output the FULL UPDATED ARTICLE in Markdown format.
                 """
-                final_md = model_pro.generate_content(fn_prompt, safety_settings=safe_config).text
-                time.sleep(3)
+                final_md = model_pro.generate_content(fn_prompt, safety_settings=local_safe_config).text
                 
-                # ---------------------------------------------------------
-                # 步骤 D: WordPress 自动排期发布
-                # ---------------------------------------------------------
-                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🌐 正在推送到 WordPress 排期系统...")
+                # ========================================================
+                # 步骤 D: WP 自动排期发布
+                # ========================================================
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🌐 推送到 WordPress 排期...")
                 log_box.code("\n".join(logs[-5:]))
                 
                 title = topic
@@ -943,21 +1173,17 @@ SEO expert enhancing articles with external links.
                 log_box.code("\n".join(logs[-5:]))
                 
                 current_schedule_time += timedelta(hours=interval_hours)
-                
-                # 完成一篇后大休眠，彻底规避 429 风控
-                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] ⏳ 本篇处理完毕，休眠 10 秒后继续...")
-                log_box.code("\n".join(logs[-5:]))
-                time.sleep(10)
+                time.sleep(10) # 完成一篇后深度休眠
                 
             except Exception as e:
-                logs.append(f"⚠️ 发生错误，已自动跳过此篇: {e}")
+                logs.append(f"⚠️ 发生错误，跳过此篇: {e}")
                 log_box.code("\n".join(logs[-5:]))
-                time.sleep(15) # 报错后多休眠一会儿
+                time.sleep(15) 
                 continue
                 
             progress_bar.progress((idx + 1) / len(topics))
             
-        status_box.success(f"🎉 批量任务全部执行完毕！共处理 {len(topics)} 篇文章。请前往 WordPress 后台查看排期日历。")
+        status_box.success(f"🎉 批量任务全部执行完毕！")
 
 # ==========================================
 # 左侧主控导航菜单
