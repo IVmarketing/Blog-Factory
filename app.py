@@ -627,7 +627,7 @@ Article Content:
         for i, img_prompt in enumerate(prompts):
             status_txt.text(f"2/4 正在调用 Recraft 出图并上传网站图库... ({i+1}/5)")
             try:
-                r_url = "[https://external.api.recraft.ai/v1/images/generations](https://external.api.recraft.ai/v1/images/generations)"
+                r_url = "https://external.api.recraft.ai/v1/images/generations".strip()
                 r_head = {"Authorization": f"Bearer {recraft_key}", "Content-Type": "application/json"}
                 r_data = {
     "prompt": img_prompt, 
@@ -736,7 +736,8 @@ You will receive an article in Markdown format.
 Article to process:
 {st.session_state.t5_seo_markdown}
             """
-            st.session_state.t5_final_markdown = model_pro.generate_content(fn_p, safety_settings=safe_config).text
+            # 换用淘宝支持的模型，并关闭安全限制与流式输出
+st.session_state.t5_final_markdown = model_flash.generate_content(fn_p, stream=False, safety_settings=None).text
         
         st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
 
