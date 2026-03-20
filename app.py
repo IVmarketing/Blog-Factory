@@ -1081,7 +1081,7 @@ Article Content:
                 logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🖼️ 将真实图片注入文章并执行 SEO...")
                 log_box.code("\n".join(logs[-5:]))
                 
-                seo_prompt = f"""
+               seo_prompt = f"""
 Your Role:
 
 You are an SEO expert specializing in image SEO optimization to enhance search engine visibility for my website.
@@ -1099,17 +1099,17 @@ Key Formatting Rules:
 2. Title Text:
 • Keep it 5 words or fewer.
 • It should be a short, catchy phrase that enhances the image’s SEO relevance.
-3. Markdown Code Block:
-• The output must always be formatted as a code block (```markdown) for easy copy-pasting.
+3. Direct Integration (CRITICAL):
 • Each image’s metadata must be presented on a separate line.
+• Do NOT wrap the image tag in a code block (```markdown). Embed it directly into the article text so the image renders natively in WordPress.
 
 My Requirements (Output Guidelines)
 1. All outputs must be in English.
-2. All outputs must be in Markdown format and wrapped inside a code block.
+2. DO NOT wrap the output or the images inside a code block. 
 3. Each image must have a separate SEO-optimized Alt Text and Title Text following the specified format.
 4. Ensure descriptions are relevant to my industry and improve SEO rankings for my website.
 
-[SYSTEM CRITICAL INSTRUCTION]: You MUST replace all `[Image X]` placeholders or existing image tags in the article with the REAL WordPress URLs provided below, formatted with the exact SEO Markdown structure requested above. OUTPUT THE FULL UPDATED MARKDOWN ARTICLE. Do not output code blocks around the entire article text, just the updated text itself.
+[SYSTEM CRITICAL INSTRUCTION]: You MUST replace all `[Image X]` placeholders or existing image tags in the article with the REAL WordPress URLs provided below. OUTPUT THE FULL UPDATED MARKDOWN ARTICLE. Do not output code blocks around the article text or around the images.
 
 REAL WordPress URLs to use sequentially:
 1. {wp_urls[0] if len(wp_urls) > 0 else 'https://placehold.co/600'}
@@ -1119,7 +1119,7 @@ REAL WordPress URLs to use sequentially:
 5. {wp_urls[4] if len(wp_urls) > 4 else 'https://placehold.co/600'}
 
 Article Content:
-{article_md}
+{md_input}
                 """
                 seo_md = model_flash.generate_content(seo_prompt, safety_settings=None).text
                 time.sleep(3)
