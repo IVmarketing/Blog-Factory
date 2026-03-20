@@ -629,7 +629,11 @@ Article Content:
             try:
                 r_url = "[https://external.api.recraft.ai/v1/images/generations](https://external.api.recraft.ai/v1/images/generations)"
                 r_head = {"Authorization": f"Bearer {recraft_key}", "Content-Type": "application/json"}
-                r_data = {"prompt": img_prompt, "style": "realistic_image"} 
+                r_data = {
+    "prompt": img_prompt, 
+    "style": "realistic_image",
+    "size": "1024x768"  # 强制生成 4:3 比例的博客黄金横图尺寸
+} 
                 r_resp = requests.post(r_url, json=r_data, headers=r_head)
                 if r_resp.status_code != 200: raise Exception(f"Recraft 报错: {r_resp.text}")
                 img_url = r_resp.json()['data'][0]['url']
