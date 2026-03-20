@@ -584,32 +584,39 @@ def tool5_publish():
             p = f"""
 Your Role:
 
-You will generate Recraft.ai image generation prompts for illustrations that accompany my blog articles.
+You are an SEO expert specializing in image SEO optimization to enhance search engine visibility for my website.
 
 Your Responsibilities:
 
-When I provide you with the content of a blog article, you must generate five image generation prompts that accurately match the meaning or scenario described in the input.
+Each time I upload one or multiple images, you must generate SEO-optimized metadata for each image in the following Markdown format:
 
-Each prompt must follow these guidelines:
-1. Start each prompt with a concise Chinese title that summarizes the scene depicted. Ensure the title is clearly separated from the prompt text and does not mix with it.
-2. Each prompt must be at least 70 words long and written in clear, specific English. Avoid vague descriptions.
-3. Each prompt should provide a detailed description of the image, including:
-• Objects, people, and scene elements
-• Colors, lighting, and atmosphere
-• Perspective (e.g., close-up shot, wide-angle, aerial view, etc.)
-• Possible artistic style (e.g., photography, 3D render, digital illustration, etc.)
+![Alternative text, concise image description (≤15 words)](#placeholder_link "Title text (≤5 words)")
 
-## My Role:
-{persona_input}
+Key Formatting Rules:
+1. Alternative Text (Alt Text):
+• Describe the image concisely in 15 words or fewer.
+• Make it descriptive and meaningful for both SEO and accessibility.
+2. Title Text:
+• Keep it 5 words or fewer.
+• It should be a short, catchy phrase that enhances the image’s SEO relevance.
+3. Direct Integration (CRITICAL):
+• Each image’s metadata must be presented on a separate line.
+• Do NOT wrap the image tag in a code block (```markdown). Embed it directly into the article text so the image renders natively in WordPress.
 
 My Requirements (Output Guidelines)
-1. All prompts must be written in English.
-2. Each prompt must be at least 70 words long.
-3. Each prompt must begin with a Chinese title summarizing the scene, ensuring it is distinct from the prompt itself.
-4. The prompts must be precise and vivid, aligned with my industry background. Avoid vague or generic descriptions.
+1. All outputs must be in English.
+2. DO NOT wrap the output or the images inside a code block. 
+3. Each image must have a separate SEO-optimized Alt Text and Title Text following the specified format.
+4. Ensure descriptions are relevant to my industry and improve SEO rankings for my website.
 
-[SYSTEM CRITICAL INSTRUCTION]: You MUST output the final result strictly as a valid JSON array containing exactly 5 strings. Do not include markdown formatting like ```json.
-Example: ["Title 1 prompt...", "Title 2 prompt...", "Title 3 prompt...", "Title 4 prompt...", "Title 5 prompt..."]
+[SYSTEM CRITICAL INSTRUCTION]: You MUST replace all `[Image X]` placeholders or existing image tags in the article with the REAL WordPress URLs provided below. OUTPUT THE FULL UPDATED MARKDOWN ARTICLE. Do not output code blocks around the article text or around the images.
+
+REAL WordPress URLs to use sequentially:
+1. {wp_urls[0] if len(wp_urls) > 0 else 'https://placehold.co/600'}
+2. {wp_urls[1] if len(wp_urls) > 1 else 'https://placehold.co/600'}
+3. {wp_urls[2] if len(wp_urls) > 2 else 'https://placehold.co/600'}
+4. {wp_urls[3] if len(wp_urls) > 3 else 'https://placehold.co/600'}
+5. {wp_urls[4] if len(wp_urls) > 4 else 'https://placehold.co/600'}
 
 Article Content:
 {md_input}
