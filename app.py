@@ -738,8 +738,7 @@ Article to process:
             """
             # 换用淘宝支持的模型，并关闭安全限制与流式输出
 st.session_state.t5_final_markdown = model_flash.generate_content(fn_p, stream=False, safety_settings=None).text
-        
-        st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
+st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
 
     # ---------------------------------------------------------
     # 第 4 步：展示结果并发布
