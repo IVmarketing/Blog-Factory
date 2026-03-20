@@ -1088,6 +1088,7 @@ Article Content:
                 # 步骤 C2: 图片 SEO
                 logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🖼️ 将真实图片注入文章并执行 SEO...")
                 log_box.code("\n".join(logs[-5:]))
+                
       seo_prompt = f"""
       
 Your Role:
