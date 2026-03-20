@@ -636,7 +636,7 @@ Article Content:
                 r_url_raw = "https://external.api.recraft.ai/v1/images/generations"
                 r_url = r_url_raw.encode('ascii', 'ignore').decode('ascii')
                 r_head = {"Authorization": f"Bearer {recraft_key}", "Content-Type": "application/json"}
-                r_data = {"prompt": img_prompt, "style": "realistic_image", "size": "1024x768"} 
+                r_data = {"prompt": img_prompt, "style": "realistic_image", "size": "1365x1024"} 
                 r_resp = requests.post(r_url, json=r_data, headers=r_head)
                 if r_resp.status_code != 200: raise Exception(f"Recraft 报错: {r_resp.text}")
                 img_url = r_resp.json()['data'][0]['url']
@@ -1041,7 +1041,7 @@ Article Content:
                         r_url_raw = "https://external.api.recraft.ai/v1/images/generations"
                         r_url = r_url_raw.encode('ascii', 'ignore').decode('ascii')
                         r_head = {"Authorization": f"Bearer {recraft_key}", "Content-Type": "application/json"}
-                        r_data = {"prompt": p_text, "style": "realistic_image", "size": "1024x768"} 
+                        r_data = {"prompt": p_text, "style": "realistic_image", "size": "1365x1024"} 
                         r_resp = requests.post(r_url, json=r_data, headers=r_head)
                         if r_resp.status_code != 200: raise Exception(f"Recraft failed")
                         img_url = r_resp.json()['data'][0]['url']
