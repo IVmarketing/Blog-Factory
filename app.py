@@ -619,7 +619,7 @@ REAL WordPress URLs to use sequentially:
 5. {wp_urls[4] if len(wp_urls) > 4 else 'https://placehold.co/600'}
 
 Article Content:
-{md_input}
+{article_md}
             """
             try:
                 res = model_flash.generate_content(p, safety_settings=None).text
@@ -710,7 +710,7 @@ REAL WordPress URLs to use sequentially:
 5. {wp_urls[4] if len(wp_urls) > 4 else 'https://placehold.co/600'}
 
 Article Content:
-{md_input}
+{article_md}
             """
             st.session_state.t5_seo_markdown = model_flash.generate_content(seo_p, safety_settings=None).text
 
@@ -1127,7 +1127,7 @@ REAL WordPress URLs to use sequentially:
 5. {wp_urls[4] if len(wp_urls) > 4 else 'https://placehold.co/600'}
 
 Article Content:
-{md_input}
+{article_md}
                 """
                 seo_md = model_flash.generate_content(seo_prompt, safety_settings=None).text
                 time.sleep(3)
