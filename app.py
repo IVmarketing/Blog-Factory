@@ -822,7 +822,24 @@ Article to process:
             with st.spinner("文章发布中..."):
                 try:
                     title = "AI Draft"
-                    final_content = st.session_state.t5_final_markdown
+                    # 1. 拿到最终的文章文本
+                    raw_content = st.session_state.t5_final_markdown.strip()
+                    
+                    # 2. 暴力清洗外壳：如果大模型在开头加了 ```markdown 或 ```，直接砍掉！
+                    if raw_content.startswith('```markdown'):
+                        raw_content = raw_content[11:].strip()
+                    elif raw_content.startswith('```md'):
+                        raw_content = raw_content[5:].strip()
+                    elif raw_content.startswith('```'):
+                        raw_content = raw_content[3:].strip()
+                        
+                    # 3. 暴力清洗尾部：如果结尾带了 ```，也直接砍掉！
+                    if raw_content.endswith('```'):
+                        raw_content = raw_content[:-3].strip()
+
+                    final_content = raw_content
+                    
+                    # 提取标题的循环保持不变
                     for line in final_content.split('\n'):
                         if line.startswith("# "):
                             title = line.replace("# ", "").strip()
