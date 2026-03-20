@@ -633,7 +633,8 @@ Article Content:
         for i, img_prompt in enumerate(prompts):
             status_txt.text(f"2/4 正在调用 Recraft 出图并上传网站图库... ({i+1}/5)")
             try:
-                r_url = "[https://external.api.recraft.ai/v1/images/generations](https://external.api.recraft.ai/v1/images/generations)".strip()
+                r_url_raw = "https://external.api.recraft.ai/v1/images/generations"
+                r_url = r_url_raw.encode('ascii', 'ignore').decode('ascii')
                 r_head = {"Authorization": f"Bearer {recraft_key}", "Content-Type": "application/json"}
                 r_data = {"prompt": img_prompt, "style": "realistic_image", "size": "1024x768"} 
                 r_resp = requests.post(r_url, json=r_data, headers=r_head)
@@ -1037,7 +1038,8 @@ Article Content:
                 wp_urls = []
                 for i, p_text in enumerate(img_prompts_list[:5]): 
                     try:
-                        r_url = "[https://external.api.recraft.ai/v1/images/generations](https://external.api.recraft.ai/v1/images/generations)".strip()
+                        r_url_raw = "https://external.api.recraft.ai/v1/images/generations"
+                        r_url = r_url_raw.encode('ascii', 'ignore').decode('ascii')
                         r_head = {"Authorization": f"Bearer {recraft_key}", "Content-Type": "application/json"}
                         r_data = {"prompt": p_text, "style": "realistic_image", "size": "1024x768"} 
                         r_resp = requests.post(r_url, json=r_data, headers=r_head)
