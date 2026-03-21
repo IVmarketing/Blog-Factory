@@ -619,17 +619,17 @@ Article Content:
             try:
                 # 请求 Unsplash 搜索接口
                 u_url = "https://api.unsplash.com/search/photos"
-                        # 💡 强制清洗幽灵空格，并改用官方最推荐的 Header 验证方式
-                        u_headers = {
+                # 💡 强制清洗幽灵空格，并改用官方最推荐的 Header 验证方式
+                u_headers = {
                             "Authorization": f"Client-ID {unsplash_key.strip()}",
                             "Accept-Version": "v1"
                         }
-                        u_params = {
+                u_params = {
                             "query": keyword,
                             "per_page": 1, 
                             "orientation": "landscape"
                         }
-                        u_resp = requests.get(u_url, headers=u_headers, params=u_params)
+                u_resp = requests.get(u_url, headers=u_headers, params=u_params)
                 
                 if u_resp.status_code != 200: raise Exception(f"Unsplash API 报错: {u_resp.text}")
                 
