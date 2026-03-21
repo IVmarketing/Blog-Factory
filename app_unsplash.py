@@ -619,7 +619,6 @@ Article Content:
             try:
                 # 请求 Unsplash 搜索接口
                 u_url = "https://api.unsplash.com/search/photos"
-                        
                         # 💡 强制清洗幽灵空格，并改用官方最推荐的 Header 验证方式
                         u_headers = {
                             "Authorization": f"Client-ID {unsplash_key.strip()}",
