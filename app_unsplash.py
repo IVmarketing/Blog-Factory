@@ -1256,7 +1256,9 @@ Article to process:
                         break
                         
                 schedule_iso = current_schedule_time.strftime("%Y-%m-%dT%H:%M:%S")
-                wp_data = {"title": title, "content": final_md_clean, "status": "future", "date": schedule_iso}
+                # 💡 降维打击：在 Python 内部直接将 Markdown 编译为原生 HTML
+                html_content = markdown.markdown(final_md_clean, extensions=['tables', 'fenced_code'])
+                wp_data = {"title": title, "content": html_content, "status": "future", "date": schedule_iso}
                 r = requests.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=wp_data, auth=HTTPBasicAuth(w_user, w_pass))
                 
                 if r.status_code == 201: logs.append(f"✅ 成功！已排期至 {schedule_iso}")
