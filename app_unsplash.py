@@ -618,14 +618,19 @@ Article Content:
             status_txt.text(f"2/4 正在 Unsplash 搜索 '{keyword}' 并上传网站图库... ({i+1}/5)")
             try:
                 # 请求 Unsplash 搜索接口
-                u_url = "[https://api.unsplash.com/search/photos](https://api.unsplash.com/search/photos)"
-                u_params = {
-                    "query": keyword, 
-                    "client_id": unsplash_key, 
-                    "per_page": 1, 
-                    "orientation": "landscape" # 获取横图
-                }
-                u_resp = requests.get(u_url, params=u_params)
+                u_url = "https://api.unsplash.com/search/photos"
+                        
+                        # 💡 强制清洗幽灵空格，并改用官方最推荐的 Header 验证方式
+                        u_headers = {
+                            "Authorization": f"Client-ID {unsplash_key.strip()}",
+                            "Accept-Version": "v1"
+                        }
+                        u_params = {
+                            "query": keyword,
+                            "per_page": 1, 
+                            "orientation": "landscape"
+                        }
+                        u_resp = requests.get(u_url, headers=u_headers, params=u_params)
                 
                 if u_resp.status_code != 200: raise Exception(f"Unsplash API 报错: {u_resp.text}")
                 
