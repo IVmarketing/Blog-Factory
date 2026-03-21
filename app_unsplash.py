@@ -7,6 +7,7 @@ import requests
 import re
 from requests.auth import HTTPBasicAuth
 from datetime import datetime, timedelta
+import markdown
 
 # ==========================================
 # 0. 全局配置与模型初始化 (对接第三方中转 API)
