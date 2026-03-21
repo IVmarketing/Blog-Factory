@@ -19,11 +19,11 @@ def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
 
 if api_key: 
-    # ⚠️ 核心修改 1：指定中转域名，并强制使用 REST 协议
+   # ⚠️ 核心修改 1：指定中转域名，并强制使用 REST 协议
     genai.configure(
         api_key=api_key,
         transport="rest",
-        client_options={"api_endpoint": "[https://api.viviai.cc](https://api.viviai.cc)"}
+        client_options={"api_endpoint": "api.viviai.cc"}
     )
 else: 
     st.error("❌ 未检测到 GEMINI_API_KEY。请配置。")
