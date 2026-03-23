@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 # ==========================================
 # 0. 全局配置与模型初始化
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (HF最新路由版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (HF FLUX满血版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -550,7 +550,7 @@ def tool5_publish():
     st.markdown("#### 图片来源设置")
     img_source = st.selectbox("选择自动配图的渠道：", [
         "1. Pollinations.ai (极度白嫖：完全免费、免注册、免API Key)", 
-        "2. Hugging Face (大厂免绑卡白嫖：SDXL顶级模型，只需邮箱免绑卡)"
+        "2. Hugging Face (大厂免绑卡白嫖：FLUX顶级模型，只需邮箱免绑卡)"
     ], index=1, key="t5_source")
     
     hf_key = ""
@@ -632,9 +632,9 @@ Article Content:
                     if poll_resp.status_code != 200: raise Exception(f"Pollinations API Error: {poll_resp.status_code}")
                     img_bytes = poll_resp.content
                 else:
-                    # 💡 核心修复：Hugging Face 官方最新路由推理 API (解决弃用报错)
-                    r_url = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
-                    r_head = {"Authorization": f"Bearer {hf_key}"}
+                    # 💡 核心修复：更换为绝对支持 HF 免费套餐的 FLUX.1-schnell 模型！
+                    r_url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
+                    r_head = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
                     r_data = {"inputs": pure_en_prompt}
                     
                     for attempt in range(3):
@@ -896,7 +896,7 @@ def tool7_batch_publish():
         
         img_source = st.selectbox("选择自动配图的渠道：", [
             "1. Pollinations.ai (极度白嫖：完全免费、免注册、免API Key)", 
-            "2. Hugging Face (大厂免绑卡白嫖：SDXL顶级模型，只需邮箱注册获取Token)"
+            "2. Hugging Face (大厂免绑卡白嫖：FLUX顶级模型，只需邮箱注册获取Token)"
         ], index=1, key="img_src_7")
         
         hf_key = ""
@@ -1109,9 +1109,9 @@ Article Content:
                             if poll_resp.status_code != 200: raise Exception(f"Pollinations API Error: {poll_resp.status_code}")
                             img_bytes = poll_resp.content
                         else:
-                            # 💡 核心修复：Hugging Face 官方最新路由推理 API (解决弃用报错)
-                            r_url = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
-                            r_head = {"Authorization": f"Bearer {hf_key}"}
+                            # 💡 核心修复：更换为绝对支持 HF 免费套餐的 FLUX.1-schnell 模型！
+                            r_url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
+                            r_head = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
                             r_data = {"inputs": pure_en_prompt}
                             
                             for attempt in range(3):
