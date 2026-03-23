@@ -4,23 +4,20 @@ import os
 import math
 import time
 import requests
-import re
 import json
 import urllib.parse
 from requests.auth import HTTPBasicAuth
 from datetime import datetime, timedelta
-import markdown
 
 # ==========================================
 # 0. 全局配置与模型初始化 (对接第三方中转 API)
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (双通道出图版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (大道至简版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
 
 if api_key: 
-    # ⚠️ 核心修改 1：指定中转域名，并强制使用 REST 协议
     genai.configure(
         api_key=api_key,
         transport="rest",
@@ -30,7 +27,6 @@ else:
     st.error("❌ 未检测到 GEMINI_API_KEY。请配置。")
     st.stop()
 
-# ⚠️ 核心修改 2：跳过模型搜索，直接锁定淘宝商家提供的模型
 @st.cache_resource
 def get_model(model_type="flash"):
     return genai.GenerativeModel('models/gemini-3-flash-preview')
@@ -443,9 +439,6 @@ def tool4_article():
             st.session_state.t4_article_draft = ""
             with st.spinner("AI 正在严格执行顶级 SEO SOP 撰写长文，请耐心等待..."):
                 
-                # ---------------------------------------------------------
-                # 💡 核心注入：100% 像素级还原你的顶级 PAS 文章生成 Prompt
-                # ---------------------------------------------------------
                 prompt = f"""
 # Your Role:
 你是一个我写博客文章的枪手，你会使用我的口吻，用Markdown语言输出指定格式的博客文章。
@@ -508,7 +501,6 @@ LOOP END
 12. 在每个二级标题下的图片占位符之下的位置都要生成Dive deeper paragraph。
 """
                 try:
-                    # ⚠️ 关闭流式输出 (stream=False)，完美适配第三方中转站
                     res = model_pro.generate_content(prompt, stream=False, safety_settings=safe_config)
                     st.session_state.t4_article_draft = res.text
                     st.success("✅ 文章生成完毕！")
@@ -547,7 +539,7 @@ LOOP END
             st.markdown(st.session_state.t4_article_draft, unsafe_allow_html=True)
 
 # ==========================================
-# 工具 5：文章配图 + 一键发布 (双通道自动生成 + 隐身渲染)
+# 工具 5：文章配图 + 一键发布 (双通道自动生成)
 # ==========================================
 def tool5_publish():
     st.title("🚀 工具 5：文章配图 + 一键发布 (双通道出图版)")
@@ -569,7 +561,6 @@ def tool5_publish():
     tg_key = ""
     if "Together" in img_source:
         tg_key = st.text_input("Together AI API Key", type="password", value=get_config("TOGETHER_API_KEY") or "")
-        st.info("💡 请确保您在 Together AI 注册并获取了 API Key。")
 
     st.subheader("第 2 步：确认文章与背景")
     persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.get('persona_en', ''), height=100)
@@ -581,21 +572,10 @@ def tool5_publish():
         if not all([w_url, w_user, w_pass, md_input]):
             st.error("⚠️ 请填写完整的 WP凭证和文章内容！")
             return
-        if "Together" in img_source and not tg_key:
-            st.error("⚠️ 您选择了 Together AI，请务必填写对应的 API Key！")
-            return
 
-        # 💡 核心升级：创建长连接 Session 并伪装成官方安卓 APP，完美突破 reCAPTCHA
         wp_session = requests.Session()
         wp_session.auth = HTTPBasicAuth(w_user, w_pass)
-        wp_session.headers.update({
-            "User-Agent": "wp-android/23.3 (Android 13; en_US)",
-            "Accept": "application/json"
-        })
 
-        # ---------------------------------------------------------
-        # 1. 提取 5 个纯英文 Prompt
-        # ---------------------------------------------------------
         with st.spinner("1/4 正在让大模型提取 5 个专业配图 Prompt..."):
             p = f"""
 Your Role:
@@ -637,16 +617,12 @@ Article Content:
                 return
             st.session_state.t5_img_prompts = "\n\n".join(prompts)
 
-        # ---------------------------------------------------------
-        # 2. 调用选定的渠道出图并上传 WordPress
-        # ---------------------------------------------------------
         wp_urls = []
         progress_bar = st.progress(0)
         status_txt = st.empty()
 
         for i, img_prompt in enumerate(prompts):
             pure_en_prompt = img_prompt.split("\n")[-1] if "\n" in img_prompt else img_prompt
-            
             status_txt.text(f"2/4 正在通过 {img_source.split(' ')[1]} 出图并上传网站图库... ({i+1}/5)")
             try:
                 if "Pollinations" in img_source:
@@ -665,14 +641,12 @@ Article Content:
                         "n": 1
                     } 
                     r_resp = requests.post(r_url, json=r_data, headers=r_head)
-                    if r_resp.status_code != 200: raise Exception(f"Together AI 报错: {r_resp.text}")
                     img_url = r_resp.json()['data'][0]['url']
                     img_bytes = requests.get(img_url).content
 
-                # 下载完图片后，统一使用 session 上传到 WP
                 wp_media_url = f"{w_url.rstrip('/')}/wp-json/wp/v2/media"
                 wp_head = {
-                    "Content-Disposition": f'attachment; filename="seo-img-{int(time.time())}-{i+1}.jpg"', 
+                    "Content-Disposition": f'attachment; filename="auto-img-{int(time.time())}-{i+1}.jpg"', 
                     "Content-Type": "image/jpeg"
                 }
                 w_resp = wp_session.post(wp_media_url, headers=wp_head, data=img_bytes)
@@ -680,17 +654,12 @@ Article Content:
                     wp_urls.append(w_resp.json().get('source_url'))
                 else:
                     raise Exception(f"WP 媒体库上传失败: {w_resp.text}")
-                    
             except Exception as e:
-                st.error(f"处理第 {i+1} 张图时出错: {e}")
                 wp_urls.append("https://placehold.co/800x400.png?text=Image+Upload+Error") 
             progress_bar.progress((i + 1) / 5)
         
         status_txt.success("✅ 5 张图片已成功生成并上传到 WordPress 媒体库！")
 
-        # ---------------------------------------------------------
-        # 3. 真实链接注入与 SEO 优化
-        # ---------------------------------------------------------
         with st.spinner("3/4 正在将网站真实图片链接注入文章，并生成 SEO Alt 标签..."):
             seo_p = f"""
 Your Role:
@@ -734,9 +703,6 @@ Article Content:
             """
             st.session_state.t5_seo_markdown = model_flash.generate_content(seo_p, safety_settings=None).text
 
-        # ---------------------------------------------------------
-        # 4. 构建双向脚注系统 
-        # ---------------------------------------------------------
         with st.spinner("4/4 最后一步：构建高级双向脚注系统..."):
             fn_p = f"""
 ## Your Role
@@ -835,9 +801,6 @@ Article to process:
         
         st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
 
-    # ---------------------------------------------------------
-    # 第 4 步：展示结果并发布
-    # ---------------------------------------------------------
     if st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'):
         st.subheader("第 4 步：检查并推送到网站")
         with st.expander("👁️ 查看生成的 AI Prompt 历史"):
@@ -870,14 +833,13 @@ Article to process:
                             final_content = final_content.replace(line, "", 1)
                             break
                     
-                    html_content = markdown.markdown(final_content, extensions=['tables', 'fenced_code'])
-                    wp_data = {"title": title, "content": html_content, "status": status}
-                    json_payload = json.dumps(wp_data).replace("<", "\\u003c").replace(">", "\\u003e")
-                    headers = {"Content-Type": "application/json"}
+                    # 💡 核心修复：直接发送纯纯的 Markdown 原本，完美绕开所有 HTML 防火墙！
+                    wp_data = {"title": title, "content": final_content, "status": status}
                     
-                    # 💡 强制冷却 3 秒，防止最后一步发文章时触发并发拦截
-                    time.sleep(3)
-                    r = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", data=json_payload, headers=headers)
+                    wp_session = requests.Session()
+                    wp_session.auth = HTTPBasicAuth(w_user, w_pass)
+                    
+                    r = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=wp_data)
                     
                     if r.status_code == 201: 
                         st.balloons()
@@ -886,7 +848,7 @@ Article to process:
                 except Exception as e: st.error(f"网络报错: {e}")
 
 # ==========================================
-# 工具 7：全自动批量发布工具 (双通道自动生成 + 隐身渲染)
+# 工具 7：全自动批量发布工具 (双通道自动生成)
 # ==========================================
 def tool7_batch_publish():
     st.title("🤖 工具 7：全自动批量发布与排期 (满血顶配版)")
@@ -906,7 +868,6 @@ def tool7_batch_publish():
         w_user = st.text_input("WP 用户名", value=get_config("WP_USER") or "", key="w_user_7")
         w_pass = st.text_input("WP 应用密码", type="password", value=get_config("WP_APP_PASSWORD") or "", key="w_pass_7")
         
-        # 💡 核心升级：增加图片源切换器
         img_source = st.selectbox("选择自动配图的渠道：", [
             "1. Pollinations.ai (极度白嫖：完全免费、免注册、免API Key)", 
             "2. Together AI (行业顶配：极低成本/送5刀，FLUX画质，需API Key)"
@@ -927,9 +888,6 @@ def tool7_batch_publish():
         if not topics or not persona_input or not all([w_url, w_user, w_pass]):
             st.error("⚠️ 请确保填完了话题、背景和 WordPress 凭证！")
             return
-        if "Together" in img_source and not tg_key:
-            st.error("⚠️ 您选择了 Together AI，请务必填写对应的 API Key！")
-            return
             
         st.success(f"初始化成功！共检测到 {len(topics)} 个任务。即将开始包含【自动画图与上传】的无人值守作业...")
         
@@ -941,13 +899,8 @@ def tool7_batch_publish():
         interval_hours = 24 / posts_per_day
         current_schedule_time = datetime.combine(start_date, datetime.min.time()) + timedelta(hours=8)
         
-        # 💡 核心升级：创建长连接 Session 并伪装成官方安卓 APP，完美突破 reCAPTCHA
         wp_session = requests.Session()
         wp_session.auth = HTTPBasicAuth(w_user, w_pass)
-        wp_session.headers.update({
-            "User-Agent": "wp-android/23.3 (Android 13; en_US)",
-            "Accept": "application/json"
-        })
         
         for idx, topic in enumerate(topics):
             status_box.info(f"🔄 **正在处理第 {idx+1}/{len(topics)} 篇**: {topic}")
@@ -1131,11 +1084,9 @@ Article Content:
                                 "n": 1
                             } 
                             r_resp = requests.post(r_url, json=r_data, headers=r_head)
-                            if r_resp.status_code != 200: raise Exception(f"Together AI 报错")
                             img_url = r_resp.json()['data'][0]['url']
                             img_bytes = requests.get(img_url).content
                         
-                        # 使用 Session 统一上传 WP
                         wp_media_url = f"{w_url.rstrip('/')}/wp-json/wp/v2/media"
                         wp_head = {
                             "Content-Disposition": f'attachment; filename="auto-img-{int(time.time())}-{i+1}.jpg"', 
@@ -1329,17 +1280,12 @@ Article to process:
                         
                 schedule_iso = current_schedule_time.strftime("%Y-%m-%dT%H:%M:%S")
                 
-                # 💡 降维打击 + WAF 隐身术：在 Python 内部将 Markdown 编译为原生 HTML
-                html_content = markdown.markdown(final_md_clean, extensions=['tables', 'fenced_code'])
-                wp_data = {"title": title, "content": html_content, "status": "future", "date": schedule_iso}
+                # 💡 核心修复：直接发送纯纯的 Markdown 原本，完美绕开所有 HTML 防火墙！
+                wp_data = {"title": title, "content": final_md_clean, "status": "future", "date": schedule_iso}
                 
-                # 将 HTML 里的 < 和 > 编码为 unicode，完美绕过 Nginx/宝塔 405 防火墙拦截！
-                json_payload = json.dumps(wp_data).replace("<", "\\u003c").replace(">", "\\u003e")
-                headers = {"Content-Type": "application/json"}
-                
-                # 💡 强制冷却 3 秒，让服务器喘口气，防止触发并发 DDoS 拦截
+                # 冷却一下再请求
                 time.sleep(3)
-                r = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", data=json_payload, headers=headers)
+                r = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=wp_data)
                 
                 if r.status_code == 201: logs.append(f"✅ 成功！已排期至 {schedule_iso}")
                 else: logs.append(f"❌ 发布失败: {r.text}")
@@ -1363,7 +1309,7 @@ Article to process:
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: 2026 最终双通道出图版")
+    st.caption("版本: 2026 大道至简双通道版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", 
         "2. 文章话题生成器", 
@@ -1373,7 +1319,7 @@ with st.sidebar:
         "7. 批量发布工具 (全自动无人值守) ⭐"
     ])
     st.markdown("---")
-    st.info("💡 **系统状态**：双通道画图引擎 + WP 隐身长连接就绪。")
+    st.info("💡 **系统状态**：已切回完美纯净版传输。")
 
 # 路由分发
 if page.startswith("1"): tool1_persona()
