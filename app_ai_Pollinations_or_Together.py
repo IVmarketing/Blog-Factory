@@ -1333,15 +1333,15 @@ Article to process:
                 wp_data = {"title": title, "content": html_content, "status": "future", "date": schedule_iso}
                 
                 # 将 HTML 里的 < 和 > 编码为 unicode，完美绕过 Nginx/宝塔 405 防火墙拦截！
-                    json_payload = json.dumps(wp_data).replace("<", "\\u003c").replace(">", "\\u003e")
+                json_payload = json.dumps(wp_data).replace("<", "\\u003c").replace(">", "\\u003e")
                     
-                    # 💡 核心升级：增加真实的 Chrome 浏览器身份伪装，绕过机器人检测
-                    headers = {
+                # 💡 核心升级：增加真实的 Chrome 浏览器身份伪装，绕过机器人检测
+                headers = {
                         "Content-Type": "application/json",
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
                     }
                     
-                    r = requests.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", data=json_payload, headers=headers, auth=HTTPBasicAuth(w_user, w_pass))
+                r = requests.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", data=json_payload, headers=headers, auth=HTTPBasicAuth(w_user, w_pass))
                 
                 if r.status_code == 201: logs.append(f"✅ 成功！已排期至 {schedule_iso}")
                 else: logs.append(f"❌ 发布失败: {r.text}")
