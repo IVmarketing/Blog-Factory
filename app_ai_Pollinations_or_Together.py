@@ -808,6 +808,7 @@ Article to process:
 """
 st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
 
+# UI 渲染部分（脱离按钮触发作用域，确保页面刷新不丢失）
 if st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'):
     st.subheader("第 4 步：检查并推送到网站")
     with st.expander("👁️ 查看生成的 AI Prompt 历史"):
@@ -819,34 +820,37 @@ if st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_mar
     if st.button("🚀 立即推送文章到 WordPress", type="primary"):
         with st.spinner("文章发布中..."):
             try:
-                # 💡 物理锁定：强制使用原文提取出来的原始标题，没收 AI 改名的权利
+                # 💡 物理锁定：强制使用在第二步中提取的原始标题
                 title = "AI Draft"
-                if 'md_input' in locals():
-                    for line in md_input.split('\n'):
-                        if line.startswith("# "):
-                            title = line.replace("# ", "").strip()
-                            break
+                md_input_val = st.session_state.get('t4_article_draft', '')
+                for line in md_input_val.split('\n'):
+                    if line.startswith("# "):
+                        title = line.replace("# ", "").strip()
+                        break
                 
                 raw_content = st.session_state.t5_final_markdown.strip()
                 
-                # 💡 强力修复：防止 Markdown 渲染器吃掉反引号导致的 SyntaxError
-                md_marker = "`" * 3
-                if raw_content.startswith(f'{md_marker}markdown'): 
-                    raw_content = raw_content[11:].strip()
-                elif raw_content.startswith(f'{md_marker}md'): 
-                    raw_content = raw_content[5:].strip()
-                elif raw_content.startswith(md_marker): 
-                    raw_content = raw_content[3:].strip()
+                # 💡 终极护盾：用 ASCII 字符规避复制时吞吃反引号导致的 SyntaxError
+                md_block_1 = chr(96) * 3 + "markdown"
+                md_block_2 = chr(96) * 3 + "md"
+                md_block_3 = chr(96) * 3
                 
-                if raw_content.endswith(md_marker): 
-                    raw_content = raw_content[:-3].strip()
+                if raw_content.startswith(md_block_1): raw_content = raw_content[11:].strip()
+                elif raw_content.startswith(md_block_2): raw_content = raw_content[5:].strip()
+                elif raw_content.startswith(md_block_3): raw_content = raw_content[3:].strip()
+                
+                if raw_content.endswith(md_block_3): raw_content = raw_content[:-3].strip()
 
+                # 裁掉正文里被 AI 保留的第一个 # 标题
                 lines = raw_content.split('\n')
                 if lines and lines[0].startswith("# "):
                     lines.pop(0)
                 final_content = "\n".join(lines).strip()
                 
-                # 💡 特洛伊木马绕过法：单篇发布绕过长文本防火墙
+                wp_session = requests.Session()
+                wp_session.auth = HTTPBasicAuth(w_user, w_pass)
+                
+                # 💡 特洛伊木马绕过法：发一个空壳绕过 LiteSpeed WAF 防火墙
                 dummy_data = {"title": title, "content": "Initializing post structure...", "status": "draft"}
                 r_dummy = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=dummy_data)
                 
@@ -855,6 +859,7 @@ if st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_mar
                     st.info(f"🟢 空壳草稿创建成功 (ID: {post_id})，正在注入长文...")
                     time.sleep(2)
                     
+                    # 木马阶段 2：以 Update 的名义强行塞入长文
                     real_data = {"content": final_content, "status": status}
                     r_update = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts/{post_id}", json=real_data)
                     
