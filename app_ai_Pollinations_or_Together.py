@@ -10,7 +10,7 @@ from requests.auth import HTTPBasicAuth
 from datetime import datetime, timedelta
 
 # ==========================================
-# 0. 全局配置与模型初始化 (对接第三方中转 API)
+# 0. 全局配置与模型初始化
 # ==========================================
 st.set_page_config(page_title="AI Writer 工业化中心 (大道至简版)", layout="wide")
 
@@ -35,7 +35,6 @@ model_flash = get_model("flash")
 model_pro = get_model("pro")
 
 safe_config = None
-
 
 # ==========================================
 # 1. 全局状态管理
@@ -70,6 +69,8 @@ def init_session_state():
     if 't5_final_markdown' not in st.session_state: st.session_state.t5_final_markdown = ""
 
 init_session_state()
+
+# [此处省略工具 1 到 4 的代码，它们没有变化，直接看下面的工具 5 和 7]
 
 # ==========================================
 # 工具 1：创建【我的角色背景】
@@ -833,7 +834,7 @@ Article to process:
                             final_content = final_content.replace(line, "", 1)
                             break
                     
-                    # 💡 核心修复：直接发送纯纯的 Markdown 原本，完美绕开所有 HTML 防火墙！
+                    # 💡 核心修复：直接发送纯正 Markdown，彻底绕过 WAF！
                     wp_data = {"title": title, "content": final_content, "status": status}
                     
                     wp_session = requests.Session()
@@ -859,8 +860,9 @@ def tool7_batch_publish():
     with col1:
         st.subheader("1. 基础素材配置")
         persona_input = st.text_area("角色背景 (必填)：", value=st.session_state.get('persona_en', ''), height=150)
-        default_topics = "\n".join(st.session_state.get('t2_results', [])) if st.session_state.get('t2_results') else ""
-        topics_input = st.text_area("粘贴批量话题 (每行一个)：", value=default_topics, height=200)
+        
+        # 💡 核心优化：修复框内残留历史数据的 BUG，大框默认不展示工具2的结果
+        topics_input = st.text_area("粘贴批量话题 (每行一个，请先清空框内文字再粘贴！)：", value="", height=200, help="请将你想要写的话题粘贴在此处。")
 
     with col2:
         st.subheader("2. API 与 WordPress 配置")
@@ -887,6 +889,11 @@ def tool7_batch_publish():
         topics = [t.strip() for t in topics_input.split('\n') if t.strip()]
         if not topics or not persona_input or not all([w_url, w_user, w_pass]):
             st.error("⚠️ 请确保填完了话题、背景和 WordPress 凭证！")
+            return
+            
+        # 💡 核心优化：修复 API 密钥校验漏网之鱼，防止跳过画图环节
+        if "Together" in img_source and not tg_key:
+            st.error("⚠️ 您选择了 Together AI 出图，请务必填写 API Key！否则无法画图！")
             return
             
         st.success(f"初始化成功！共检测到 {len(topics)} 个任务。即将开始包含【自动画图与上传】的无人值守作业...")
@@ -1084,6 +1091,7 @@ Article Content:
                                 "n": 1
                             } 
                             r_resp = requests.post(r_url, json=r_data, headers=r_head)
+                            if r_resp.status_code != 200: raise Exception(f"Together AI API Error")
                             img_url = r_resp.json()['data'][0]['url']
                             img_bytes = requests.get(img_url).content
                         
@@ -1280,10 +1288,9 @@ Article to process:
                         
                 schedule_iso = current_schedule_time.strftime("%Y-%m-%dT%H:%M:%S")
                 
-                # 💡 核心修复：直接发送纯纯的 Markdown 原本，完美绕开所有 HTML 防火墙！
+                # 💡 核心修复：用原始的纯正 Markdown 发送，彻底瓦解服务器 WAF 的代码注入报警
                 wp_data = {"title": title, "content": final_md_clean, "status": "future", "date": schedule_iso}
                 
-                # 冷却一下再请求
                 time.sleep(3)
                 r = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=wp_data)
                 
