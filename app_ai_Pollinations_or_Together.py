@@ -11,7 +11,7 @@ from requests.auth import HTTPBasicAuth
 from datetime import datetime, timedelta
 
 # ==========================================
-# 0. 全局配置与模型初始化 
+# 0. 全局配置与模型初始化
 # ==========================================
 st.set_page_config(page_title="AI Writer 工业化中心 (HF最新路由版)", layout="wide")
 
@@ -534,11 +534,11 @@ LOOP END
             st.markdown(st.session_state.t4_article_draft, unsafe_allow_html=True)
 
 # ==========================================
-# 工具 5：文章配图 + 一键发布 (防缩进全量版)
+# 工具 5：文章配图 + 一键发布 (单篇满血全量版)
 # ==========================================
 def tool5_publish():
     st.title("🚀 工具 5：文章配图 + 一键发布 (HF免绑卡白嫖版)")
-    st.markdown("支持在完全免费的 Pollinations.ai 和 Hugging Face 官方通道之间一键切换。")
+    st.markdown("支持在完全免费的 Pollinations.ai 和 Hugging Face 官方免费通道之间一键切换。")
     st.divider()
 
     st.subheader("第 1 步：配置所有 API 与凭证")
@@ -547,6 +547,7 @@ def tool5_publish():
     with c2: w_user = st.text_input("WP User", value=get_config("WP_USER") or "", key="t5_wuser")
     with c3: w_pass = st.text_input("WP App Password", type="password", value=get_config("WP_APP_PASSWORD") or "", key="t5_wpass")
     
+    st.markdown("#### 图片来源设置")
     img_source = st.selectbox("选择自动配图的渠道：", [
         "1. Pollinations.ai (极度白嫖：完全免费、免注册、免API Key)", 
         "2. Hugging Face (大厂免绑卡白嫖：SDXL顶级模型，只需邮箱免绑卡)"
@@ -626,11 +627,12 @@ Article Content:
                 if "Pollinations" in img_source:
                     safe_prompt = urllib.parse.quote(pure_en_prompt)
                     img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1024&height=768&nologo=true"
-                    poll_resp = requests.get(img_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=45)
+                    poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                    poll_resp = requests.get(img_url, headers=poll_head, timeout=45)
                     if poll_resp.status_code != 200: raise Exception(f"Pollinations API Error: {poll_resp.status_code}")
                     img_bytes = poll_resp.content
                 else:
-                    # 💡 Hugging Face 官方最新路由推理 API (2026版)
+                    # 💡 核心修复：Hugging Face 官方最新路由推理 API (解决弃用报错)
                     r_url = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
                     r_head = {"Authorization": f"Bearer {hf_key}"}
                     r_data = {"inputs": pure_en_prompt}
@@ -805,7 +807,7 @@ Article to process:
 
         st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
 
-    # 💡 UI 渲染部分（必须脱离 button 作用域，确保重绘不丢失）
+    # UI 渲染部分（必须脱离 button 作用域，确保重绘不丢失）
     if st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'):
         st.subheader("第 4 步：检查并推送到网站")
         with st.expander("👁️ 查看生成的 AI Prompt 历史"):
@@ -858,6 +860,7 @@ Article to process:
                         st.info(f"🟢 空壳草稿创建成功 (ID: {post_id})，正在注入 HTML 长文...")
                         time.sleep(2)
                         
+                        # 木马阶段 2：以 Update 的名义强行塞入长文
                         real_data = {"content": html_content, "status": status}
                         r_update = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts/{post_id}", json=real_data)
                         
@@ -1106,7 +1109,7 @@ Article Content:
                             if poll_resp.status_code != 200: raise Exception(f"Pollinations API Error: {poll_resp.status_code}")
                             img_bytes = poll_resp.content
                         else:
-                            # 💡 Hugging Face 官方最新路由推理 API (2026版)
+                            # 💡 核心修复：Hugging Face 官方最新路由推理 API (解决弃用报错)
                             r_url = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
                             r_head = {"Authorization": f"Bearer {hf_key}"}
                             r_data = {"inputs": pure_en_prompt}
