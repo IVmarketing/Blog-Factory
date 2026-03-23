@@ -6,13 +6,14 @@ import time
 import requests
 import json
 import urllib.parse
+import markdown  # 💡 新增：用于将 Markdown 转换为 WordPress 认识的 HTML
 from requests.auth import HTTPBasicAuth
 from datetime import datetime, timedelta
 
 # ==========================================
 # 0. 全局配置与模型初始化
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (满血防弹全量版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (完美渲染版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -414,7 +415,7 @@ def tool3_materials():
                 st.rerun()
 
 # ==========================================
-# 工具 4：文章生成器
+# 工具 4：文章生成器 
 # ==========================================
 def tool4_article():
     st.title("✍️ 工具 4：文章生成器")
@@ -533,7 +534,7 @@ LOOP END
             st.markdown(st.session_state.t4_article_draft, unsafe_allow_html=True)
 
 # ==========================================
-# 工具 5：文章配图 + 一键发布 (单篇满血全量版)
+# 工具 5：文章配图 + 一键发布 (单篇全量特洛伊版)
 # ==========================================
 def tool5_publish():
     st.title("🚀 工具 5：文章配图 + 一键发布 (HF免绑卡白嫖版)")
@@ -542,28 +543,25 @@ def tool5_publish():
 
     st.subheader("第 1 步：配置所有 API 与凭证")
     c1, c2, c3 = st.columns(3)
-    with c1: w_url = st.text_input("WP URL (含 https)", value=get_config("WP_URL") or "", key="t5_wurl")
-    with c2: w_user = st.text_input("WP User", value=get_config("WP_USER") or "", key="t5_wuser")
-    with c3: w_pass = st.text_input("WP App Password", type="password", value=get_config("WP_APP_PASSWORD") or "", key="t5_wpass")
+    with c1: w_url = st.text_input("WP URL (含 https)", value=get_config("WP_URL") or "")
+    with c2: w_user = st.text_input("WP User", value=get_config("WP_USER") or "")
+    with c3: w_pass = st.text_input("WP App Password", type="password", value=get_config("WP_APP_PASSWORD") or "")
     
     st.markdown("#### 图片来源设置")
     img_source = st.selectbox("选择自动配图的渠道：", [
         "1. Pollinations.ai (极度白嫖：完全免费、免注册、免API Key)", 
         "2. Hugging Face (大厂免绑卡白嫖：SDXL顶级模型，只需邮箱免绑卡)"
-    ], index=1, key="t5_source")
+    ], index=1)
     
-    hf_key = ""
-    if "Hugging Face" in img_source:
-        hf_key = st.text_input("Hugging Face Access Token (必须填写)", type="password", value=get_config("HF_API_KEY") or "", key="t5_hf_key")
-        st.info("💡 请前往 Hugging Face 官网注册免费账号，并在 Settings -> Access Tokens 中创建一个 Token。")
+    hf_key = st.text_input("Hugging Face Access Token (选通道2必填)", type="password", value=get_config("HF_API_KEY") or "")
 
     st.subheader("第 2 步：确认文章与背景")
-    persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.get('persona_en', ''), height=100, key="t5_persona")
-    md_input = st.text_area("粘贴 Markdown 文章全文 (包含占位符)：", value=st.session_state.get('t4_article_draft', ''), height=200, key="t5_md_input")
+    persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.get('persona_en', ''), height=100)
+    md_input = st.text_area("粘贴 Markdown 文章全文 (包含占位符)：", value=st.session_state.get('t4_article_draft', ''), height=200)
 
     st.subheader("第 3 步：全自动化处理 (AI配图 → WP上传 → SEO替换 → 脚注)")
     
-    if st.button("🌟 一键执行：全自动配图与深度优化", type="primary", use_container_width=True, key="btn_t5_exec"):
+    if st.button("🌟 一键执行：全自动配图与深度优化", type="primary", use_container_width=True):
         if not all([w_url, w_user, w_pass, md_input]):
             st.error("⚠️ 请填写完整的 WP凭证和文章内容！")
             return
@@ -601,7 +599,7 @@ My Requirements (Output Guidelines)
 3. Each prompt must begin with a Chinese title summarizing the scene, ensuring it is distinct from the prompt itself.
 4. The prompts must be precise and vivid, aligned with my industry background. Avoid vague or generic descriptions.
 
-[SYSTEM CRITICAL INSTRUCTION]: You MUST output the final result strictly as a valid JSON array containing exactly 5 strings. Do not include markdown formatting like ```json.
+[SYSTEM CRITICAL INSTRUCTION]: You MUST output the final result strictly as a valid JSON array containing exactly 5 strings. Do not include markdown formatting like {chr(96)*3}json.
 Example: ["Title 1 prompt...", "Title 2 prompt...", "Title 3 prompt...", "Title 4 prompt...", "Title 5 prompt..."]
 
 Article Content:
@@ -626,8 +624,7 @@ Article Content:
                 if "Pollinations" in img_source:
                     safe_prompt = urllib.parse.quote(pure_en_prompt)
                     img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1024&height=768&nologo=true"
-                    poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-                    poll_resp = requests.get(img_url, headers=poll_head, timeout=45)
+                    poll_resp = requests.get(img_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=45)
                     if poll_resp.status_code != 200: raise Exception(f"Pollinations API Error: {poll_resp.status_code}")
                     img_bytes = poll_resp.content
                 else:
@@ -659,7 +656,7 @@ Article Content:
                     raise Exception(f"WP 媒体库上传失败: {w_resp.text}")
             except Exception as e:
                 st.error(f"⚠️ 图片 {i+1} 处理崩溃: {str(e)[:100]}")
-                wp_urls.append(f"https://placehold.co/800x400.png?text=Image+Upload+Error") 
+                wp_urls.append(f"https://placehold.co/800x400.png?text=Error+{i+1}") 
             progress_bar.progress((i + 1) / 5)
         
         status_txt.success("✅ 5 张图片已成功生成并上传到 WordPress 媒体库！")
@@ -685,7 +682,7 @@ Key Formatting Rules:
 • It should be a short, catchy phrase that enhances the image’s SEO relevance.
 3. Direct Integration (CRITICAL):
 • Each image’s metadata must be presented on a separate line.
-• Do NOT wrap the image tag in a code block (```markdown). Embed it directly into the article text so the image renders natively in WordPress.
+• Do NOT wrap the image tag in a code block ({chr(96)*3}markdown). Embed it directly into the article text so the image renders natively in WordPress.
 
 My Requirements (Output Guidelines)
 1. All outputs must be in English.
@@ -805,74 +802,64 @@ Article to process:
 
         st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
 
-    # UI 渲染部分（必须脱离 button 执行流）
+    # 💡 UI 渲染部分必须靠左顶格，它依赖于 session_state 触发，不能放在 button 里面！
     if st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'):
         st.subheader("第 4 步：检查并推送到网站")
         with st.expander("👁️ 查看生成的 AI Prompt 历史"):
             st.code(st.session_state.get('t5_img_prompts', ''), language="json")
             
-        st.session_state.t5_final_markdown = st.text_area("最终 Markdown (所有图片已替换为您的网站图库链接)：", value=st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'), height=400, key="t5_final_output_box")
+        st.session_state.t5_final_markdown = st.text_area("最终 Markdown (所有图片已替换为您的网站图库链接)：", value=st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'), height=400)
         
-        status = st.selectbox("发布状态", ["draft", "publish"], key="t5_status_box")
-        if st.button("🚀 立即推送文章到 WordPress", type="primary", key="btn_publish_t5"):
+        status = st.selectbox("发布状态", ["draft", "publish"])
+        if st.button("🚀 立即推送文章到 WordPress", type="primary"):
             with st.spinner("文章发布中..."):
                 try:
-                    # 💡 物理锁定：强制使用原文提取出来的原始标题，没收 AI 改名的权利
-                    title = "AI Draft"
-                    md_input_val = st.session_state.get('t4_article_draft', '')
-                    if md_input_val:
-                        for line in md_input_val.split('\n'):
-                            if line.startswith("# "):
-                                title = line.replace("# ", "").strip()
-                                break
-                    
-                    raw_content = st.session_state.t5_final_markdown.strip()
-                    
-                    # 💡 终极护盾：用 ASCII 字符规避复制时吞吃反引号导致的 SyntaxError
-                    md_block_1 = chr(96) * 3 + "markdown"
-                    md_block_2 = chr(96) * 3 + "md"
-                    md_block_3 = chr(96) * 3
-                    
-                    if raw_content.startswith(md_block_1): raw_content = raw_content[11:].strip()
-                    elif raw_content.startswith(md_block_2): raw_content = raw_content[5:].strip()
-                    elif raw_content.startswith(md_block_3): raw_content = raw_content[3:].strip()
-                    
-                    if raw_content.endswith(md_block_3): raw_content = raw_content[:-3].strip()
+                    # 💡 Markdown HTML 渲染补丁：将 Markdown 转为 WordPress 认识的 HTML！
+                    raw_md = st.session_state.t5_final_markdown.strip()
+                    md_marker = chr(96) * 3
+                    if raw_md.startswith(md_marker + "markdown"): raw_md = raw_md[11:].strip()
+                    elif raw_md.startswith(md_marker + "md"): raw_md = raw_md[5:].strip()
+                    elif raw_md.startswith(md_marker): raw_md = raw_md[3:].strip()
+                    if raw_md.endswith(md_marker): raw_md = raw_md[:-3].strip()
 
-                    # 裁掉正文里被 AI 保留的第一个 # 标题
-                    lines = raw_content.split('\n')
+                    lines = raw_md.split('\n')
+                    title = "AI Draft"
                     if lines and lines[0].startswith("# "):
+                        title = lines[0].replace("# ", "").strip()
                         lines.pop(0)
-                    final_content = "\n".join(lines).strip()
                     
+                    pure_md_text = "\n".join(lines).strip()
+                    
+                    # 💡 核心渲染：把处理干净的 Markdown 翻译成 HTML
+                    html_content = markdown.markdown(pure_md_text, extensions=['tables'])
+
                     wp_session = requests.Session()
                     wp_session.auth = HTTPBasicAuth(w_user, w_pass)
                     
-                    # 💡 特洛伊木马绕过法：发一个 10 字空壳绕过 LiteSpeed WAF 防火墙
-                    dummy_data = {"title": title, "content": "Initializing post structure...", "status": "draft"}
+                    # 💡 特洛伊木马计绕过 WAF 防火墙
+                    dummy_data = {"title": title, "content": "Initializing post...", "status": "draft"}
                     r_dummy = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=dummy_data)
                     
                     if r_dummy.status_code == 201:
                         post_id = r_dummy.json().get('id')
-                        st.info(f"🟢 空壳草稿创建成功 (ID: {post_id})，正在注入长文...")
+                        st.info(f"🟢 空壳草稿创建成功 (ID: {post_id})，正在注入长文 HTML...")
                         time.sleep(2)
                         
-                        # 木马阶段 2：以 Update 的名义强行塞入 1500 字长文
-                        real_data = {"content": final_content, "status": status}
+                        real_data = {"content": html_content, "status": status}
                         r_update = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts/{post_id}", json=real_data)
                         
                         if r_update.status_code == 200:
                             st.balloons()
-                            st.success(f"🎉 特洛伊注入发布成功！点击查看：[立即预览]({r_update.json().get('link')})")
+                            st.success(f"🎉 特洛伊发布成功！完美渲染！链接：{r_update.json().get('link')}")
                         else: 
                             st.error(f"❌ 长文注入失败 ({r_update.status_code}): {r_update.text}")
                     else:
                         st.error(f"❌ 连空壳草稿都被拦截 ({r_dummy.status_code}): {r_dummy.text}")
                         
-                except Exception as e: st.error(f"网络报错: {e}")
+                except Exception as e: st.error(f"报错: {e}")
 
 # ==========================================
-# 工具 7：全自动批量发布工具 (核心批量满血版)
+# 工具 7：全自动批量发布工具 (核心满血批量版)
 # ==========================================
 def tool7_batch_publish():
     st.title("🤖 工具 7：全自动批量发布与排期 (HF免绑卡白嫖版)")
@@ -882,10 +869,8 @@ def tool7_batch_publish():
     col1, col2 = st.columns([1, 1])
     with col1:
         st.subheader("1. 基础素材配置")
-        persona_input = st.text_area("角色背景 (必填)：", value=st.session_state.get('persona_en', ''), height=150, key="t7_persona")
-        
-        # 💡 强力修复：确保话题框完全干净，每次执行前必须手动输入最新话题，杜绝乱跑旧话题
-        topics_input = st.text_area("粘贴批量话题 (每行一个，请务必清理并粘贴你想写的新话题)：", value="", height=200, key="t7_topics")
+        persona_input = st.text_area("角色背景 (必填)：", value=st.session_state.get('persona_en', ''), height=150)
+        topics_input = st.text_area("粘贴批量话题 (每行一个，请务必清理并粘贴你想写的新话题)：", value="", height=200)
 
     with col2:
         st.subheader("2. API 与 WordPress 配置")
@@ -903,12 +888,12 @@ def tool7_batch_publish():
             hf_key = st.text_input("Hugging Face Access Token (必须填)", type="password", value=get_config("HF_API_KEY") or "", key="hf_key_7")
         
         st.markdown("---")
-        start_date = st.date_input("排期开始日期", value=datetime.today(), key="t7_date")
-        posts_per_day = st.number_input("每天发布几篇文章？", min_value=1, max_value=10, value=2, key="t7_posts_day")
+        start_date = st.date_input("排期开始日期", value=datetime.today())
+        posts_per_day = st.number_input("每天发布几篇文章？", min_value=1, max_value=10, value=2)
 
     st.markdown("---")
     
-    if st.button("🚀 确认无误，开始全自动批量执行", type="primary", use_container_width=True, key="btn_t7_exec"):
+    if st.button("🚀 确认无误，开始全自动批量执行", type="primary", use_container_width=True):
         topics = [t.strip() for t in topics_input.split('\n') if t.strip()]
         if not topics:
             st.error("⚠️ 请在文本框中粘贴至少一个话题！")
@@ -1104,8 +1089,7 @@ Article Content:
                         if "Pollinations" in img_source:
                             safe_prompt = urllib.parse.quote(pure_en_prompt)
                             img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1024&height=768&nologo=true"
-                            poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-                            poll_resp = requests.get(img_url, headers=poll_head, timeout=45)
+                            poll_resp = requests.get(img_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=45)
                             if poll_resp.status_code != 200: raise Exception(f"Pollinations API Error: {poll_resp.status_code}")
                             img_bytes = poll_resp.content
                         else:
@@ -1292,7 +1276,7 @@ Article to process:
                 final_md = model_flash.generate_content(fn_prompt, safety_settings=None).text
                 
                 # ==================================
-                # 步骤 D: WP 排期发布 (特洛伊木马绕过)
+                # 步骤 D: WP 特洛伊木马排期发布 (带 Markdown 转 HTML 渲染)
                 # ==================================
                 logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🌐 推送到 WordPress 排期...")
                 log_box.code("\n".join(logs[-5:]))
@@ -1312,7 +1296,11 @@ Article to process:
                 if lines and lines[0].startswith("# "):
                     lines.pop(0)
                 
-                final_md_clean = "\n".join(lines).strip()
+                pure_md_text = "\n".join(lines).strip()
+                
+                # 💡 核心渲染补丁：调用 markdown 库转换为 HTML，保证图片、表格、标题完美在 WordPress 显示
+                html_content = markdown.markdown(pure_md_text, extensions=['tables'])
+
                 title = topic 
                 schedule_iso = current_schedule_time.strftime("%Y-%m-%dT%H:%M:%S")
                 
@@ -1322,16 +1310,16 @@ Article to process:
                 
                 if r_dummy.status_code == 201:
                     post_id = r_dummy.json().get('id')
-                    logs.append(f"🟢 空壳草稿创建成功 (ID: {post_id})，正在注入长文...")
+                    logs.append(f"🟢 空壳草稿创建成功 (ID: {post_id})，正在注入 HTML 长文...")
                     log_box.code("\n".join(logs[-5:]))
                     time.sleep(2)
                     
-                    # 💡 木马计步骤 2：强行注入长文并排期
-                    real_data = {"content": final_md_clean, "status": "future", "date": schedule_iso}
+                    # 💡 木马计步骤 2：强行注入已渲染的 HTML 长文并排期
+                    real_data = {"content": html_content, "status": "future", "date": schedule_iso}
                     r_update = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts/{post_id}", json=real_data)
                     
                     if r_update.status_code == 200:
-                        logs.append(f"✅ 成功！已排期至 {schedule_iso}")
+                        logs.append(f"✅ 成功！已完美渲染并排期至 {schedule_iso}")
                     else: 
                         logs.append(f"❌ 长文注入失败: {r_update.text}")
                 else:
@@ -1352,11 +1340,11 @@ Article to process:
         status_box.success(f"🎉 批量任务全部执行完毕！")
 
 # ==========================================
-# 左侧主控导航菜单
+# 导航菜单
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: 2026 满血防弹全量版")
+    st.caption("版本: 2026 最终无删减防弹版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", "2. 文章话题生成器", "3. 写文章原材料",
         "4. 文章生成器", "5. 文章配图 + 一键发布", "7. 批量发布工具 ⭐"
