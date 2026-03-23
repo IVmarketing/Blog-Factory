@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 # ==========================================
 # 0. 全局配置与模型初始化
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (暴力重试白嫖版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (最新API防弹版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -538,7 +538,7 @@ LOOP END
 # ==========================================
 def tool5_publish():
     st.title("🚀 工具 5：文章配图 + 一键发布 (极速白嫖防弹版)")
-    st.markdown("已内置暴力重试逻辑，确保免费出图不再因拥堵报错。")
+    st.markdown("已内置暴力重试逻辑与最新 API 路由，确保出图稳定无报错。")
     st.divider()
 
     st.subheader("第 1 步：配置所有 API 与凭证")
@@ -549,13 +549,13 @@ def tool5_publish():
     
     st.markdown("#### 图片来源设置")
     img_source = st.selectbox("选择自动配图的渠道：", [
-        "1. Pollinations.ai (已启用 5 次狂暴重试机制，免填Key)", 
-        "2. Together AI (如果您有额度可以选择此项)"
+        "1. Pollinations.ai (最新官方路由，5次暴力重试，完全免Key)", 
+        "2. Hugging Face (大厂免绑卡白嫖：FLUX顶级模型，需填写Token)"
     ], index=0, key="t5_source")
     
-    tg_key = ""
-    if "Together" in img_source:
-        tg_key = st.text_input("Together AI API Key (必须填写)", type="password", value=get_config("TOGETHER_API_KEY") or "", key="t5_tg_key")
+    hf_key = ""
+    if "Hugging Face" in img_source:
+        hf_key = st.text_input("Hugging Face Access Token (必须填)", type="password", value=get_config("HF_API_KEY") or "", key="t5_hf_key")
 
     st.subheader("第 2 步：确认文章与背景")
     persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.get('persona_en', ''), height=100, key="t5_persona")
@@ -622,36 +622,36 @@ Article Content:
             try:
                 if "Pollinations" in img_source:
                     safe_prompt = urllib.parse.quote(pure_en_prompt)
-                    img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1024&height=768&nologo=true"
+                    # 💡 核心修复 1：更换为最新的 gen.pollinations.ai 域名！彻底解决 404 找不到页面的问题
+                    img_url = f"https://gen.pollinations.ai/image/{safe_prompt}?width=1024&height=768&nologo=true"
                     poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
                     
-                    # 💡 核心强化：Pollinations 5次狂暴重试机制
                     for attempt in range(5):
                         poll_resp = requests.get(img_url, headers=poll_head, timeout=45)
                         if poll_resp.status_code == 200:
                             img_bytes = poll_resp.content
                             break
                         else:
-                            time.sleep(3) # 遭遇500报错，等待3秒后重试
+                            time.sleep(3)
                     else:
                         raise Exception(f"Pollinations 连续5次请求失败: {poll_resp.status_code}")
                 else:
-                    r_url = "https://api.together.xyz/v1/images/generations"
-                    r_head = {"Authorization": f"Bearer {tg_key}", "Content-Type": "application/json"}
-                    r_data = {
-                        "model": "black-forest-labs/FLUX.1-schnell",
-                        "prompt": pure_en_prompt,
-                        "width": 1024,
-                        "height": 768,
-                        "steps": 4,
-                        "n": 1
-                    }
-                    r_resp = requests.post(r_url, json=r_data, headers=r_head)
-                    if r_resp.status_code == 200:
-                        img_url = r_resp.json()['data'][0]['url']
-                        img_bytes = requests.get(img_url).content
+                    # 💡 核心修复 2：更换为官方支持的 FLUX.1-schnell 路由，彻底告别旧版 SDXL 下架报错！
+                    r_url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
+                    r_head = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
+                    r_data = {"inputs": pure_en_prompt}
+                    
+                    for attempt in range(3):
+                        r_resp = requests.post(r_url, json=r_data, headers=r_head)
+                        if r_resp.status_code == 200:
+                            img_bytes = r_resp.content
+                            break
+                        elif r_resp.status_code == 503:
+                            time.sleep(10)
+                        else:
+                            raise Exception(f"Hugging Face 报错: {r_resp.text}")
                     else:
-                        raise Exception(f"Together AI 报错: {r_resp.text}")
+                        raise Exception("Hugging Face 模型加载超时")
 
                 wp_media_url = f"{w_url.rstrip('/')}/wp-json/wp/v2/media"
                 wp_head = {
@@ -823,7 +823,6 @@ Article to process:
         if st.button("🚀 立即推送文章到 WordPress", type="primary", key="btn_publish_t5"):
             with st.spinner("文章发布中..."):
                 try:
-                    # 💡 强行锁定原始标题
                     title = "AI Draft"
                     md_input_val = st.session_state.get('t4_article_draft', '')
                     if md_input_val:
@@ -834,7 +833,6 @@ Article to process:
                     
                     raw_content = st.session_state.t5_final_markdown.strip()
                     
-                    # 💡 终极护盾：用 ASCII 字符规避反引号截断
                     md_block_1 = chr(96) * 3 + "markdown"
                     md_block_2 = chr(96) * 3 + "md"
                     md_block_3 = chr(96) * 3
@@ -849,13 +847,11 @@ Article to process:
                         lines.pop(0)
                     pure_md_text = "\n".join(lines).strip()
                     
-                    # 💡 核心渲染补丁：将 Markdown 转换为 WordPress 认识的 HTML
                     html_content = markdown.markdown(pure_md_text, extensions=['tables'])
                     
                     wp_session = requests.Session()
                     wp_session.auth = HTTPBasicAuth(w_user, w_pass)
                     
-                    # 💡 特洛伊木马绕过法：发一个空壳绕过 LiteSpeed WAF
                     dummy_data = {"title": title, "content": "Initializing post structure...", "status": "draft"}
                     r_dummy = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=dummy_data)
                     
@@ -864,7 +860,6 @@ Article to process:
                         st.info(f"🟢 空壳草稿创建成功 (ID: {post_id})，正在注入 HTML 长文...")
                         time.sleep(2)
                         
-                        # 木马阶段 2：以 Update 的名义强行塞入长文
                         real_data = {"content": html_content, "status": status}
                         r_update = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts/{post_id}", json=real_data)
                         
@@ -899,13 +894,13 @@ def tool7_batch_publish():
         w_pass = st.text_input("WP 应用密码", type="password", value=get_config("WP_APP_PASSWORD") or "", key="w_pass_7")
         
         img_source = st.selectbox("选择自动配图的渠道：", [
-            "1. Pollinations.ai (已启用 5 次狂暴重试机制，免填Key)", 
-            "2. Together AI (如果您有额度可以选择此项)"
+            "1. Pollinations.ai (最新官方路由，5次暴力重试，完全免Key)", 
+            "2. Hugging Face (大厂免绑卡白嫖：FLUX顶级模型，需填写Token)"
         ], index=0, key="img_src_7")
         
-        tg_key = ""
-        if "Together" in img_source:
-            tg_key = st.text_input("Together AI API Key (必须填)", type="password", value=get_config("TOGETHER_API_KEY") or "", key="tg_key_7")
+        hf_key = ""
+        if "Hugging Face" in img_source:
+            hf_key = st.text_input("Hugging Face Access Token (必须填)", type="password", value=get_config("HF_API_KEY") or "", key="hf_key_7")
         
         st.markdown("---")
         start_date = st.date_input("排期开始日期", value=datetime.today(), key="t7_date")
@@ -921,8 +916,8 @@ def tool7_batch_publish():
         if not persona_input or not all([w_url, w_user, w_pass]):
             st.error("⚠️ 请确保填完了背景和 WordPress 凭证！")
             return
-        if "Together" in img_source and not tg_key:
-            st.error("⚠️ 您选择了 Together AI 出图，请务必填写 API Key！")
+        if "Hugging Face" in img_source and not hf_key:
+            st.error("⚠️ 您选择了 Hugging Face 出图，请务必填写 Access Token！")
             return
             
         st.success(f"初始化成功！共检测到 {len(topics)} 个任务。即将开始...")
@@ -1108,36 +1103,36 @@ Article Content:
                     try:
                         if "Pollinations" in img_source:
                             safe_prompt = urllib.parse.quote(pure_en_prompt)
-                            img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1024&height=768&nologo=true"
+                            # 💡 核心修复 1：更换为最新的 gen.pollinations.ai 域名
+                            img_url = f"https://gen.pollinations.ai/image/{safe_prompt}?width=1024&height=768&nologo=true"
                             poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
                             
-                            # 💡 核心强化：Pollinations 5次狂暴重试机制
                             for attempt in range(5):
                                 poll_resp = requests.get(img_url, headers=poll_head, timeout=45)
                                 if poll_resp.status_code == 200:
                                     img_bytes = poll_resp.content
                                     break
                                 else:
-                                    time.sleep(3) 
+                                    time.sleep(3)
                             else:
                                 raise Exception(f"Pollinations 连续5次请求失败: {poll_resp.status_code}")
                         else:
-                            r_url = "https://api.together.xyz/v1/images/generations"
-                            r_head = {"Authorization": f"Bearer {tg_key}", "Content-Type": "application/json"}
-                            r_data = {
-                                "model": "black-forest-labs/FLUX.1-schnell",
-                                "prompt": pure_en_prompt,
-                                "width": 1024,
-                                "height": 768,
-                                "steps": 4,
-                                "n": 1
-                            }
-                            r_resp = requests.post(r_url, json=r_data, headers=r_head)
-                            if r_resp.status_code == 200:
-                                img_url = r_resp.json()['data'][0]['url']
-                                img_bytes = requests.get(img_url).content
+                            # 💡 核心修复 2：更换为官方支持的 FLUX.1-schnell 路由
+                            r_url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
+                            r_head = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
+                            r_data = {"inputs": pure_en_prompt}
+                            
+                            for attempt in range(3):
+                                r_resp = requests.post(r_url, json=r_data, headers=r_head)
+                                if r_resp.status_code == 200:
+                                    img_bytes = r_resp.content
+                                    break
+                                elif r_resp.status_code == 503:
+                                    time.sleep(10)
+                                else:
+                                    raise Exception(f"Hugging Face 报错: {r_resp.text}")
                             else:
-                                raise Exception(f"Together AI 报错: {r_resp.text}")
+                                raise Exception("Hugging Face 模型加载超时")
 
                         wp_media_url = f"{w_url.rstrip('/')}/wp-json/wp/v2/media"
                         wp_head = {
@@ -1327,13 +1322,11 @@ Article to process:
                 
                 pure_md_text = "\n".join(lines).strip()
                 
-                # 💡 核心渲染补丁：调用 markdown 库转换为 HTML
                 html_content = markdown.markdown(pure_md_text, extensions=['tables'])
 
                 title = topic 
                 schedule_iso = current_schedule_time.strftime("%Y-%m-%dT%H:%M:%S")
                 
-                # 💡 木马计步骤 1：空壳绕过防火墙
                 dummy_data = {"title": title, "content": "Initializing post structure...", "status": "draft"}
                 r_dummy = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=dummy_data)
                 
@@ -1343,7 +1336,6 @@ Article to process:
                     log_box.code("\n".join(logs[-5:]))
                     time.sleep(2)
                     
-                    # 💡 木马计步骤 2：强行注入已渲染的 HTML 并排期
                     real_data = {"content": html_content, "status": "future", "date": schedule_iso}
                     r_update = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts/{post_id}", json=real_data)
                     
@@ -1369,11 +1361,11 @@ Article to process:
         status_box.success(f"🎉 批量任务全部执行完毕！")
 
 # ==========================================
-# 左侧主控导航菜单
+# 导航菜单
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: 2026 暴力重试白嫖版")
+    st.caption("版本: 2026 满血防弹全量版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", "2. 文章话题生成器", "3. 写文章原材料",
         "4. 文章生成器", "5. 文章配图 + 一键发布", "7. 批量发布工具 ⭐"
