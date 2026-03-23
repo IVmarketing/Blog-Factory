@@ -6,14 +6,14 @@ import time
 import requests
 import json
 import urllib.parse
-import markdown  # 💡 新增：用于将 Markdown 转换为 WordPress 认识的 HTML
+import markdown
 from requests.auth import HTTPBasicAuth
 from datetime import datetime, timedelta
 
 # ==========================================
-# 0. 全局配置与模型初始化
+# 0. 全局配置与模型初始化 
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (完美渲染版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (HF最新路由版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -534,34 +534,36 @@ LOOP END
             st.markdown(st.session_state.t4_article_draft, unsafe_allow_html=True)
 
 # ==========================================
-# 工具 5：文章配图 + 一键发布 (单篇全量特洛伊版)
+# 工具 5：文章配图 + 一键发布 (防缩进全量版)
 # ==========================================
 def tool5_publish():
     st.title("🚀 工具 5：文章配图 + 一键发布 (HF免绑卡白嫖版)")
-    st.markdown("支持在完全免费的 Pollinations.ai 和 Hugging Face 官方免费通道之间一键切换。")
+    st.markdown("支持在完全免费的 Pollinations.ai 和 Hugging Face 官方通道之间一键切换。")
     st.divider()
 
     st.subheader("第 1 步：配置所有 API 与凭证")
     c1, c2, c3 = st.columns(3)
-    with c1: w_url = st.text_input("WP URL (含 https)", value=get_config("WP_URL") or "")
-    with c2: w_user = st.text_input("WP User", value=get_config("WP_USER") or "")
-    with c3: w_pass = st.text_input("WP App Password", type="password", value=get_config("WP_APP_PASSWORD") or "")
+    with c1: w_url = st.text_input("WP URL (含 https)", value=get_config("WP_URL") or "", key="t5_wurl")
+    with c2: w_user = st.text_input("WP User", value=get_config("WP_USER") or "", key="t5_wuser")
+    with c3: w_pass = st.text_input("WP App Password", type="password", value=get_config("WP_APP_PASSWORD") or "", key="t5_wpass")
     
-    st.markdown("#### 图片来源设置")
     img_source = st.selectbox("选择自动配图的渠道：", [
         "1. Pollinations.ai (极度白嫖：完全免费、免注册、免API Key)", 
         "2. Hugging Face (大厂免绑卡白嫖：SDXL顶级模型，只需邮箱免绑卡)"
-    ], index=1)
+    ], index=1, key="t5_source")
     
-    hf_key = st.text_input("Hugging Face Access Token (选通道2必填)", type="password", value=get_config("HF_API_KEY") or "")
+    hf_key = ""
+    if "Hugging Face" in img_source:
+        hf_key = st.text_input("Hugging Face Access Token (必须填写)", type="password", value=get_config("HF_API_KEY") or "", key="t5_hf_key")
+        st.info("💡 请前往 Hugging Face 官网注册免费账号，并在 Settings -> Access Tokens 中创建一个 Token。")
 
     st.subheader("第 2 步：确认文章与背景")
-    persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.get('persona_en', ''), height=100)
-    md_input = st.text_area("粘贴 Markdown 文章全文 (包含占位符)：", value=st.session_state.get('t4_article_draft', ''), height=200)
+    persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.get('persona_en', ''), height=100, key="t5_persona")
+    md_input = st.text_area("粘贴 Markdown 文章全文 (包含占位符)：", value=st.session_state.get('t4_article_draft', ''), height=200, key="t5_md_input")
 
     st.subheader("第 3 步：全自动化处理 (AI配图 → WP上传 → SEO替换 → 脚注)")
     
-    if st.button("🌟 一键执行：全自动配图与深度优化", type="primary", use_container_width=True):
+    if st.button("🌟 一键执行：全自动配图与深度优化", type="primary", use_container_width=True, key="btn_t5_exec"):
         if not all([w_url, w_user, w_pass, md_input]):
             st.error("⚠️ 请填写完整的 WP凭证和文章内容！")
             return
@@ -628,7 +630,8 @@ Article Content:
                     if poll_resp.status_code != 200: raise Exception(f"Pollinations API Error: {poll_resp.status_code}")
                     img_bytes = poll_resp.content
                 else:
-                    r_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+                    # 💡 Hugging Face 官方最新路由推理 API (2026版)
+                    r_url = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
                     r_head = {"Authorization": f"Bearer {hf_key}"}
                     r_data = {"inputs": pure_en_prompt}
                     
@@ -656,7 +659,7 @@ Article Content:
                     raise Exception(f"WP 媒体库上传失败: {w_resp.text}")
             except Exception as e:
                 st.error(f"⚠️ 图片 {i+1} 处理崩溃: {str(e)[:100]}")
-                wp_urls.append(f"https://placehold.co/800x400.png?text=Error+{i+1}") 
+                wp_urls.append(f"https://placehold.co/800x400.png?text=Image+Upload+Error") 
             progress_bar.progress((i + 1) / 5)
         
         status_txt.success("✅ 5 张图片已成功生成并上传到 WordPress 媒体库！")
@@ -802,47 +805,57 @@ Article to process:
 
         st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
 
-    # 💡 UI 渲染部分必须靠左顶格，它依赖于 session_state 触发，不能放在 button 里面！
+    # 💡 UI 渲染部分（必须脱离 button 作用域，确保重绘不丢失）
     if st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'):
         st.subheader("第 4 步：检查并推送到网站")
         with st.expander("👁️ 查看生成的 AI Prompt 历史"):
             st.code(st.session_state.get('t5_img_prompts', ''), language="json")
             
-        st.session_state.t5_final_markdown = st.text_area("最终 Markdown (所有图片已替换为您的网站图库链接)：", value=st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'), height=400)
+        st.session_state.t5_final_markdown = st.text_area("最终 Markdown (所有图片已替换为您的网站图库链接)：", value=st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'), height=400, key="t5_final_output_box")
         
-        status = st.selectbox("发布状态", ["draft", "publish"])
-        if st.button("🚀 立即推送文章到 WordPress", type="primary"):
+        status = st.selectbox("发布状态", ["draft", "publish"], key="t5_status_box")
+        if st.button("🚀 立即推送文章到 WordPress", type="primary", key="btn_publish_t5"):
             with st.spinner("文章发布中..."):
                 try:
-                    # 💡 Markdown HTML 渲染补丁：将 Markdown 转为 WordPress 认识的 HTML！
-                    raw_md = st.session_state.t5_final_markdown.strip()
-                    md_marker = chr(96) * 3
-                    if raw_md.startswith(md_marker + "markdown"): raw_md = raw_md[11:].strip()
-                    elif raw_md.startswith(md_marker + "md"): raw_md = raw_md[5:].strip()
-                    elif raw_md.startswith(md_marker): raw_md = raw_md[3:].strip()
-                    if raw_md.endswith(md_marker): raw_md = raw_md[:-3].strip()
-
-                    lines = raw_md.split('\n')
+                    # 💡 强行锁定原始标题
                     title = "AI Draft"
-                    if lines and lines[0].startswith("# "):
-                        title = lines[0].replace("# ", "").strip()
-                        lines.pop(0)
+                    md_input_val = st.session_state.get('t4_article_draft', '')
+                    if md_input_val:
+                        for line in md_input_val.split('\n'):
+                            if line.startswith("# "):
+                                title = line.replace("# ", "").strip()
+                                break
                     
+                    raw_content = st.session_state.t5_final_markdown.strip()
+                    
+                    # 💡 终极护盾：用 ASCII 字符规避反引号截断
+                    md_block_1 = chr(96) * 3 + "markdown"
+                    md_block_2 = chr(96) * 3 + "md"
+                    md_block_3 = chr(96) * 3
+                    
+                    if raw_content.startswith(md_block_1): raw_content = raw_content[11:].strip()
+                    elif raw_content.startswith(md_block_2): raw_content = raw_content[5:].strip()
+                    elif raw_content.startswith(md_block_3): raw_content = raw_content[3:].strip()
+                    if raw_content.endswith(md_block_3): raw_content = raw_content[:-3].strip()
+
+                    lines = raw_content.split('\n')
+                    if lines and lines[0].startswith("# "):
+                        lines.pop(0)
                     pure_md_text = "\n".join(lines).strip()
                     
-                    # 💡 核心渲染：把处理干净的 Markdown 翻译成 HTML
+                    # 💡 核心渲染补丁：将 Markdown 转换为 WordPress 认识的 HTML
                     html_content = markdown.markdown(pure_md_text, extensions=['tables'])
-
+                    
                     wp_session = requests.Session()
                     wp_session.auth = HTTPBasicAuth(w_user, w_pass)
                     
-                    # 💡 特洛伊木马计绕过 WAF 防火墙
-                    dummy_data = {"title": title, "content": "Initializing post...", "status": "draft"}
+                    # 💡 特洛伊木马绕过法：发一个空壳绕过 LiteSpeed WAF
+                    dummy_data = {"title": title, "content": "Initializing post structure...", "status": "draft"}
                     r_dummy = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=dummy_data)
                     
                     if r_dummy.status_code == 201:
                         post_id = r_dummy.json().get('id')
-                        st.info(f"🟢 空壳草稿创建成功 (ID: {post_id})，正在注入长文 HTML...")
+                        st.info(f"🟢 空壳草稿创建成功 (ID: {post_id})，正在注入 HTML 长文...")
                         time.sleep(2)
                         
                         real_data = {"content": html_content, "status": status}
@@ -850,16 +863,16 @@ Article to process:
                         
                         if r_update.status_code == 200:
                             st.balloons()
-                            st.success(f"🎉 特洛伊发布成功！完美渲染！链接：{r_update.json().get('link')}")
+                            st.success(f"🎉 特洛伊注入发布成功！完美渲染！点击查看：[立即预览]({r_update.json().get('link')})")
                         else: 
                             st.error(f"❌ 长文注入失败 ({r_update.status_code}): {r_update.text}")
                     else:
                         st.error(f"❌ 连空壳草稿都被拦截 ({r_dummy.status_code}): {r_dummy.text}")
                         
-                except Exception as e: st.error(f"报错: {e}")
+                except Exception as e: st.error(f"网络报错: {e}")
 
 # ==========================================
-# 工具 7：全自动批量发布工具 (核心满血批量版)
+# 工具 7：全自动批量发布工具 (核心批量满血版)
 # ==========================================
 def tool7_batch_publish():
     st.title("🤖 工具 7：全自动批量发布与排期 (HF免绑卡白嫖版)")
@@ -869,8 +882,8 @@ def tool7_batch_publish():
     col1, col2 = st.columns([1, 1])
     with col1:
         st.subheader("1. 基础素材配置")
-        persona_input = st.text_area("角色背景 (必填)：", value=st.session_state.get('persona_en', ''), height=150)
-        topics_input = st.text_area("粘贴批量话题 (每行一个，请务必清理并粘贴你想写的新话题)：", value="", height=200)
+        persona_input = st.text_area("角色背景 (必填)：", value=st.session_state.get('persona_en', ''), height=150, key="t7_persona")
+        topics_input = st.text_area("粘贴批量话题 (每行一个，请务必清理并粘贴你想写的新话题)：", value="", height=200, key="t7_topics")
 
     with col2:
         st.subheader("2. API 与 WordPress 配置")
@@ -888,12 +901,12 @@ def tool7_batch_publish():
             hf_key = st.text_input("Hugging Face Access Token (必须填)", type="password", value=get_config("HF_API_KEY") or "", key="hf_key_7")
         
         st.markdown("---")
-        start_date = st.date_input("排期开始日期", value=datetime.today())
-        posts_per_day = st.number_input("每天发布几篇文章？", min_value=1, max_value=10, value=2)
+        start_date = st.date_input("排期开始日期", value=datetime.today(), key="t7_date")
+        posts_per_day = st.number_input("每天发布几篇文章？", min_value=1, max_value=10, value=2, key="t7_posts_day")
 
     st.markdown("---")
     
-    if st.button("🚀 确认无误，开始全自动批量执行", type="primary", use_container_width=True):
+    if st.button("🚀 确认无误，开始全自动批量执行", type="primary", use_container_width=True, key="btn_t7_exec"):
         topics = [t.strip() for t in topics_input.split('\n') if t.strip()]
         if not topics:
             st.error("⚠️ 请在文本框中粘贴至少一个话题！")
@@ -1093,8 +1106,8 @@ Article Content:
                             if poll_resp.status_code != 200: raise Exception(f"Pollinations API Error: {poll_resp.status_code}")
                             img_bytes = poll_resp.content
                         else:
-                            # 💡 Hugging Face 官方免费推理 API
-                            r_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+                            # 💡 Hugging Face 官方最新路由推理 API (2026版)
+                            r_url = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
                             r_head = {"Authorization": f"Bearer {hf_key}"}
                             r_data = {"inputs": pure_en_prompt}
                             
@@ -1276,7 +1289,7 @@ Article to process:
                 final_md = model_flash.generate_content(fn_prompt, safety_settings=None).text
                 
                 # ==================================
-                # 步骤 D: WP 特洛伊木马排期发布 (带 Markdown 转 HTML 渲染)
+                # 步骤 D: WP 特洛伊木马排期发布 (HTML渲染版)
                 # ==================================
                 logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🌐 推送到 WordPress 排期...")
                 log_box.code("\n".join(logs[-5:]))
@@ -1298,13 +1311,13 @@ Article to process:
                 
                 pure_md_text = "\n".join(lines).strip()
                 
-                # 💡 核心渲染补丁：调用 markdown 库转换为 HTML，保证图片、表格、标题完美在 WordPress 显示
+                # 💡 核心渲染补丁：调用 markdown 库转换为 HTML，保证图片、表格完美在 WordPress 显示
                 html_content = markdown.markdown(pure_md_text, extensions=['tables'])
 
                 title = topic 
                 schedule_iso = current_schedule_time.strftime("%Y-%m-%dT%H:%M:%S")
                 
-                # 💡 木马计步骤 1：空壳绕过长文防火墙
+                # 💡 木马计步骤 1：空壳绕过防火墙
                 dummy_data = {"title": title, "content": "Initializing post structure...", "status": "draft"}
                 r_dummy = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=dummy_data)
                 
@@ -1314,7 +1327,7 @@ Article to process:
                     log_box.code("\n".join(logs[-5:]))
                     time.sleep(2)
                     
-                    # 💡 木马计步骤 2：强行注入已渲染的 HTML 长文并排期
+                    # 💡 木马计步骤 2：强行注入已渲染的 HTML 并排期
                     real_data = {"content": html_content, "status": "future", "date": schedule_iso}
                     r_update = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts/{post_id}", json=real_data)
                     
@@ -1340,11 +1353,11 @@ Article to process:
         status_box.success(f"🎉 批量任务全部执行完毕！")
 
 # ==========================================
-# 导航菜单
+# 左侧主控导航菜单
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: 2026 最终无删减防弹版")
+    st.caption("版本: 2026 满血防弹全量版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", "2. 文章话题生成器", "3. 写文章原材料",
         "4. 文章生成器", "5. 文章配图 + 一键发布", "7. 批量发布工具 ⭐"
