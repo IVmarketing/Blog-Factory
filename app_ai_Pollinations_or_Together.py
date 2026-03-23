@@ -769,3 +769,65 @@ You will receive an article in Markdown format.
 
 ```markdown
 Certifications such as [ISO 9001](https://www.example.com) <sup>[1](#footnote-1){{#ref-1}}</sup> demonstrate a supplier’s commitment to quality management.
+```
+
+❌ Incorrect:
+
+```markdown
+Certifications such as [ISO 9001](https://www.example.com) [^1] demonstrate a supplier’s commitment to quality management.
+```
+
+---
+
+## Footnotes Formatting
+
+At the end of the article, include a **Footnotes** section listing all 10 inserted links along with a short explanation and return link.
+
+✅ Markdown Example:
+
+```markdown
+---
+## Footnotes  
+
+<span id="footnote-1">1. Learn how ISO 9001 ensures consistent quality standards. [↩︎](#ref-1)</span>  
+<span id="footnote-2">2. Guide to analyzing customer reviews for supplier reliability. [↩︎](#ref-2)</span>  
+<span id="footnote-3">3. Role of third-party verification in supplier compliance. [↩︎](#ref-3)</span>  
+<span id="footnote-4">4. Insights into cost-effective logistics for supply chains. [↩︎](#ref-4)</span>  
+<span id="footnote-5">5. How trade policies affect procurement strategies. [↩︎](#ref-5)</span>  
+<span id="footnote-6">6. Explanation of sustainable sourcing practices. [↩︎](#ref-6)</span>  
+<span id="footnote-7">7. Impact of digital tools on supplier evaluation. [↩︎](#ref-7)</span>  
+<span id="footnote-8">8. Why supplier diversity strengthens global supply chains. [↩︎](#ref-8)</span>  
+<span id="footnote-9">9. Benefits of certifications for international trade compliance. [↩︎](#ref-9)</span>  
+<span id="footnote-10">10. Key trends in supplier risk management. [↩︎](#ref-10)</span>  
+```
+
+[SYSTEM INSTRUCTION: OUTPUT THE FULL UPDATED MARKDOWN ARTICLE. Do not output code blocks around the article text, just the text itself.]
+
+Article to process:
+{st.session_state.t5_seo_markdown}
+"""
+st.session_state.t5_final_markdown = model_flash.generate_content(fn_prompt, safety_settings=None).text
+st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
+
+# 注意这里的缩进！它和上方的 if st.button(...) 是平级的，脱离了按键触发的作用域。
+if st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'):
+    st.subheader("第 4 步：检查并推送到网站")
+    with st.expander("👁️ 查看生成的 AI Prompt 历史"):
+        st.code(st.session_state.get('t5_img_prompts', ''), language="json")
+        
+    st.session_state.t5_final_markdown = st.text_area("最终 Markdown (所有图片已替换为您的网站图库链接)：", value=st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'), height=400)
+    
+    status = st.selectbox("发布状态", ["draft", "publish"])
+    if st.button("🚀 立即推送文章到 WordPress", type="primary"):
+        with st.spinner("文章发布中..."):
+            try:
+                # 💡 物理锁定：强制使用原文提取出来的原始标题，没收 AI 改名的权利
+                title = "AI Draft"
+                if 'md_input' in locals():
+                    for line in md_input.split('\n'):
+                        if line.startswith("# "):
+                            title = line.replace("# ", "").strip()
+                            break
+                
+                raw_content = st.session_state.t5_final_markdown.strip()
+                if raw_content.startswith('
