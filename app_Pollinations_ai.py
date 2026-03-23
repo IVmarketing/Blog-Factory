@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 # ==========================================
 # 0. 全局配置与模型初始化
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (最新API防弹版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (截断防错白嫖版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -537,8 +537,8 @@ LOOP END
 # 工具 5：文章配图 + 一键发布 (单篇满血全量版)
 # ==========================================
 def tool5_publish():
-    st.title("🚀 工具 5：文章配图 + 一键发布 (极速白嫖防弹版)")
-    st.markdown("已内置暴力重试逻辑与最新 API 路由，确保出图稳定无报错。")
+    st.title("🚀 工具 5：文章配图 + 一键发布 (截断防错白嫖版)")
+    st.markdown("已修复提示词过长导致服务器拒收 (404/414) 的问题！")
     st.divider()
 
     st.subheader("第 1 步：配置所有 API 与凭证")
@@ -549,13 +549,13 @@ def tool5_publish():
     
     st.markdown("#### 图片来源设置")
     img_source = st.selectbox("选择自动配图的渠道：", [
-        "1. Pollinations.ai (最新官方路由，5次暴力重试，完全免Key)", 
+        "1. Pollinations.ai (修复版：自动截断过长 Prompt，免填Key)", 
         "2. Hugging Face (大厂免绑卡白嫖：FLUX顶级模型，需填写Token)"
     ], index=0, key="t5_source")
     
     hf_key = ""
     if "Hugging Face" in img_source:
-        hf_key = st.text_input("Hugging Face Access Token (必须填)", type="password", value=get_config("HF_API_KEY") or "", key="t5_hf_key")
+        hf_key = st.text_input("Hugging Face Access Token (必须填写)", type="password", value=get_config("HF_API_KEY") or "", key="t5_hf_key")
 
     st.subheader("第 2 步：确认文章与背景")
     persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.get('persona_en', ''), height=100, key="t5_persona")
@@ -566,6 +566,9 @@ def tool5_publish():
     if st.button("🌟 一键执行：全自动配图与深度优化", type="primary", use_container_width=True, key="btn_t5_exec"):
         if not all([w_url, w_user, w_pass, md_input]):
             st.error("⚠️ 请填写完整的 WP凭证和文章内容！")
+            return
+        if "Hugging Face" in img_source and not hf_key:
+            st.error("⚠️ 您选择了 Hugging Face 出图，请务必填写 Access Token！")
             return
 
         wp_session = requests.Session()
@@ -621,9 +624,12 @@ Article Content:
             status_txt.text(f"2/4 正在通过 {img_source.split(' ')[1]} 出图并上传网站图库... ({i+1}/5)")
             try:
                 if "Pollinations" in img_source:
-                    safe_prompt = urllib.parse.quote(pure_en_prompt)
-                    # 💡 核心修复 1：更换为最新的 gen.pollinations.ai 域名！彻底解决 404 找不到页面的问题
-                    img_url = f"https://gen.pollinations.ai/image/{safe_prompt}?width=1024&height=768&nologo=true"
+                    # 💡 核心修复：将超长提示词物理截断至 600 字符以内，防止触发服务器 404/414 拒收错误！
+                    short_prompt = pure_en_prompt[:600]
+                    safe_prompt = urllib.parse.quote(short_prompt)
+                    
+                    # 恢复使用官方最稳定的基础接口
+                    img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1024&height=768&nologo=true"
                     poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
                     
                     for attempt in range(5):
@@ -636,7 +642,6 @@ Article Content:
                     else:
                         raise Exception(f"Pollinations 连续5次请求失败: {poll_resp.status_code}")
                 else:
-                    # 💡 核心修复 2：更换为官方支持的 FLUX.1-schnell 路由，彻底告别旧版 SDXL 下架报错！
                     r_url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
                     r_head = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
                     r_data = {"inputs": pure_en_prompt}
@@ -651,7 +656,7 @@ Article Content:
                         else:
                             raise Exception(f"Hugging Face 报错: {r_resp.text}")
                     else:
-                        raise Exception("Hugging Face 模型加载超时")
+                        raise Exception("Hugging Face 模型加载超时，请重试")
 
                 wp_media_url = f"{w_url.rstrip('/')}/wp-json/wp/v2/media"
                 wp_head = {
@@ -877,7 +882,7 @@ Article to process:
 # 工具 7：全自动批量发布工具 (核心批量满血版)
 # ==========================================
 def tool7_batch_publish():
-    st.title("🤖 工具 7：全自动批量发布与排期 (极速白嫖防弹版)")
+    st.title("🤖 工具 7：全自动批量发布与排期 (截断防错白嫖版)")
     st.markdown("**🔥 终极效率工具**：全自动执行调研、长文、极速生图、WP图库上传、图片 SEO 与双向脚注系统。")
     st.divider()
 
@@ -894,7 +899,7 @@ def tool7_batch_publish():
         w_pass = st.text_input("WP 应用密码", type="password", value=get_config("WP_APP_PASSWORD") or "", key="w_pass_7")
         
         img_source = st.selectbox("选择自动配图的渠道：", [
-            "1. Pollinations.ai (最新官方路由，5次暴力重试，完全免Key)", 
+            "1. Pollinations.ai (修复版：自动截断过长 Prompt，免填Key)", 
             "2. Hugging Face (大厂免绑卡白嫖：FLUX顶级模型，需填写Token)"
         ], index=0, key="img_src_7")
         
@@ -1102,9 +1107,10 @@ Article Content:
                     pure_en_prompt = p_text.split("\n")[-1] if "\n" in p_text else p_text
                     try:
                         if "Pollinations" in img_source:
-                            safe_prompt = urllib.parse.quote(pure_en_prompt)
-                            # 💡 核心修复 1：更换为最新的 gen.pollinations.ai 域名
-                            img_url = f"https://gen.pollinations.ai/image/{safe_prompt}?width=1024&height=768&nologo=true"
+                            # 💡 核心修复：物理截断超长 Prompt 解决 404/414 拒收错误
+                            short_prompt = pure_en_prompt[:600]
+                            safe_prompt = urllib.parse.quote(short_prompt)
+                            img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1024&height=768&nologo=true"
                             poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
                             
                             for attempt in range(5):
@@ -1113,11 +1119,10 @@ Article Content:
                                     img_bytes = poll_resp.content
                                     break
                                 else:
-                                    time.sleep(3)
+                                    time.sleep(3) 
                             else:
                                 raise Exception(f"Pollinations 连续5次请求失败: {poll_resp.status_code}")
                         else:
-                            # 💡 核心修复 2：更换为官方支持的 FLUX.1-schnell 路由
                             r_url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
                             r_head = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
                             r_data = {"inputs": pure_en_prompt}
@@ -1361,11 +1366,11 @@ Article to process:
         status_box.success(f"🎉 批量任务全部执行完毕！")
 
 # ==========================================
-# 导航菜单
+# 左侧主控导航菜单
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: 2026 满血防弹全量版")
+    st.caption("版本: 2026 截断防错白嫖版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", "2. 文章话题生成器", "3. 写文章原材料",
         "4. 文章生成器", "5. 文章配图 + 一键发布", "7. 批量发布工具 ⭐"
