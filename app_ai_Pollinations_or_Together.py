@@ -10,9 +10,9 @@ from requests.auth import HTTPBasicAuth
 from datetime import datetime, timedelta
 
 # ==========================================
-# 0. 全局配置与模型初始化
+# 0. 全局配置与模型初始化 (对接第三方中转 API)
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (大道至简版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (精准除虫版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -70,7 +70,7 @@ def init_session_state():
 
 init_session_state()
 
-# [此处省略工具 1 到 4 的代码，它们没有变化，直接看下面的工具 5 和 7]
+# [省略工具 1 到 5，因为我们主要修复工具 7。如果需要，你可以保留之前的 1-5 代码，我这里为了简洁只给出包含工具 7 的核心结构]
 
 # ==========================================
 # 工具 1：创建【我的角色背景】
@@ -610,9 +610,8 @@ Article Content:
 {md_input}
             """
             try:
-                res = model_flash.generate_content(p, safety_settings=None).text
-                json_str = res.replace('```json', '').replace('```', '').strip()
-                prompts = json.loads(json_str)
+                res = model_flash.generate_content(p, safety_settings=None, generation_config={"response_mime_type": "application/json"}).text
+                prompts = json.loads(res)
             except Exception as e:
                 st.error(f"解析 Prompt 失败，大模型没有返回标准 JSON: {e}")
                 return
@@ -642,6 +641,9 @@ Article Content:
                         "n": 1
                     } 
                     r_resp = requests.post(r_url, json=r_data, headers=r_head)
+                    if r_resp.status_code != 200:
+                        st.error(f"Together API 错误: {r_resp.text}")
+                        raise Exception("Together API Error")
                     img_url = r_resp.json()['data'][0]['url']
                     img_bytes = requests.get(img_url).content
 
@@ -654,7 +656,8 @@ Article Content:
                 if w_resp.status_code == 201:
                     wp_urls.append(w_resp.json().get('source_url'))
                 else:
-                    raise Exception(f"WP 媒体库上传失败: {w_resp.text}")
+                    st.error(f"WP 媒体库上传失败: {w_resp.text}")
+                    raise Exception("WP Media Upload failed")
             except Exception as e:
                 wp_urls.append("https://placehold.co/800x400.png?text=Image+Upload+Error") 
             progress_bar.progress((i + 1) / 5)
@@ -796,7 +799,7 @@ At the end of the article, include a **Footnotes** section listing all 10 insert
 [SYSTEM INSTRUCTION: OUTPUT THE FULL UPDATED MARKDOWN ARTICLE. Do not output code blocks around the article text, just the text itself.]
 
 Article to process:
-{st.session_state.t5_seo_markdown}
+{seo_md}
             """
             st.session_state.t5_final_markdown = model_flash.generate_content(fn_p, safety_settings=None).text
         
@@ -834,7 +837,6 @@ Article to process:
                             final_content = final_content.replace(line, "", 1)
                             break
                     
-                    # 💡 核心修复：直接发送纯正 Markdown，彻底绕过 WAF！
                     wp_data = {"title": title, "content": final_content, "status": status}
                     
                     wp_session = requests.Session()
@@ -861,8 +863,8 @@ def tool7_batch_publish():
         st.subheader("1. 基础素材配置")
         persona_input = st.text_area("角色背景 (必填)：", value=st.session_state.get('persona_en', ''), height=150)
         
-        # 💡 核心优化：修复框内残留历史数据的 BUG，大框默认不展示工具2的结果
-        topics_input = st.text_area("粘贴批量话题 (每行一个，请先清空框内文字再粘贴！)：", value="", height=200, help="请将你想要写的话题粘贴在此处。")
+        # 💡 核心修复一：彻底斩断历史数据残留！此框默认完全空白，只读你手动粘贴的内容。
+        topics_input = st.text_area("粘贴批量话题 (每行一个)：", value="", height=200, help="请将你想要写的话题粘贴在此处。")
 
     with col2:
         st.subheader("2. API 与 WordPress 配置")
@@ -887,16 +889,17 @@ def tool7_batch_publish():
     
     if st.button("🚀 确认无误，开始全自动批量执行", type="primary", use_container_width=True):
         topics = [t.strip() for t in topics_input.split('\n') if t.strip()]
-        if not topics or not persona_input or not all([w_url, w_user, w_pass]):
-            st.error("⚠️ 请确保填完了话题、背景和 WordPress 凭证！")
+        if not topics:
+            st.error("⚠️ 请在文本框中粘贴至少一个话题！")
             return
-            
-        # 💡 核心优化：修复 API 密钥校验漏网之鱼，防止跳过画图环节
+        if not persona_input or not all([w_url, w_user, w_pass]):
+            st.error("⚠️ 请确保填完了背景和 WordPress 凭证！")
+            return
         if "Together" in img_source and not tg_key:
-            st.error("⚠️ 您选择了 Together AI 出图，请务必填写 API Key！否则无法画图！")
+            st.error("⚠️ 您选择了 Together AI 出图，请务必填写 API Key！")
             return
             
-        st.success(f"初始化成功！共检测到 {len(topics)} 个任务。即将开始包含【自动画图与上传】的无人值守作业...")
+        st.success(f"初始化成功！共检测到 {len(topics)} 个任务。即将开始...")
         
         progress_bar = st.progress(0)
         status_box = st.empty()
@@ -1062,13 +1065,15 @@ Example: ["Title 1 prompt...", "Title 2 prompt...", "Title 3 prompt...", "Title 
 Article Content:
 {article_md}
                 """
-                res = model_flash.generate_content(img_prompt_req, safety_settings=None).text
+                # 💡 核心修复二：强制输出 JSON 格式，坚决杜绝解析失败
+                res = model_flash.generate_content(img_prompt_req, safety_settings=None, generation_config={"response_mime_type": "application/json"}).text
                 
-                json_str = res.replace('```json', '').replace('```', '').strip()
                 try:
-                    img_prompts_list = json.loads(json_str)
-                except Exception:
-                    img_prompts_list = [f"Illustration for {topic} part {i+1}, highly detailed, industrial setting" for i in range(5)]
+                    img_prompts_list = json.loads(res)
+                except Exception as e:
+                    logs.append(f"❌ 大模型 JSON 解析崩溃: {e}")
+                    log_box.code("\n".join(logs[-5:]))
+                    raise Exception("Prompt Parsing Failed")
 
                 wp_urls = []
                 for i, p_text in enumerate(img_prompts_list[:5]): 
@@ -1091,7 +1096,12 @@ Article Content:
                                 "n": 1
                             } 
                             r_resp = requests.post(r_url, json=r_data, headers=r_head)
-                            if r_resp.status_code != 200: raise Exception(f"Together AI API Error")
+                            # 💡 核心修复三：如果 API 失败，必须将真实报错甩在屏幕上！
+                            if r_resp.status_code != 200: 
+                                logs.append(f"❌ Together AI 接口崩溃: {r_resp.text}")
+                                log_box.code("\n".join(logs[-5:]))
+                                raise Exception("Together API Error")
+                                
                             img_url = r_resp.json()['data'][0]['url']
                             img_bytes = requests.get(img_url).content
                         
@@ -1104,6 +1114,8 @@ Article Content:
                         if w_resp.status_code == 201:
                             wp_urls.append(w_resp.json().get('source_url'))
                         else:
+                            logs.append(f"❌ 媒体库上传失败: {w_resp.text}")
+                            log_box.code("\n".join(logs[-5:]))
                             raise Exception("WP Media Upload failed")
                     except Exception as e:
                         wp_urls.append("[https://placehold.co/800x400.png?text=Image+Upload+Error](https://placehold.co/800x400.png?text=Image+Upload+Error)") 
@@ -1259,14 +1271,13 @@ Article to process:
                 final_md = model_flash.generate_content(fn_prompt, safety_settings=None).text
                 
                 # ==================================
-                # 步骤 D: WP 自动排期发布 (脱壳核心)
+                # 步骤 D: WP 自动排期发布
                 # ==================================
                 logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🌐 推送到 WordPress 排期...")
                 log_box.code("\n".join(logs[-5:]))
                 
                 title = topic
                 
-                # 💡核心修复：暴力清洗 Markdown 外壳，防止前端将图文渲染成代码块
                 raw_content = final_md.strip()
                 if raw_content.startswith('```markdown'):
                     raw_content = raw_content[11:].strip()
@@ -1288,7 +1299,6 @@ Article to process:
                         
                 schedule_iso = current_schedule_time.strftime("%Y-%m-%dT%H:%M:%S")
                 
-                # 💡 核心修复：用原始的纯正 Markdown 发送，彻底瓦解服务器 WAF 的代码注入报警
                 wp_data = {"title": title, "content": final_md_clean, "status": "future", "date": schedule_iso}
                 
                 time.sleep(3)
@@ -1316,7 +1326,7 @@ Article to process:
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: 2026 大道至简双通道版")
+    st.caption("版本: 2026 精准除虫版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", 
         "2. 文章话题生成器", 
@@ -1326,7 +1336,7 @@ with st.sidebar:
         "7. 批量发布工具 (全自动无人值守) ⭐"
     ])
     st.markdown("---")
-    st.info("💡 **系统状态**：已切回完美纯净版传输。")
+    st.info("💡 **系统状态**：代码已进行内存隔离和强化纠错。")
 
 # 路由分发
 if page.startswith("1"): tool1_persona()
