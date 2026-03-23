@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 # ==========================================
 # 0. 全局配置与模型初始化
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (HF免绑卡白嫖版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (满血防弹全量版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -24,7 +24,7 @@ if api_key:
         client_options={"api_endpoint": "api.viviai.cc"}
     )
 else: 
-    st.error("❌ 未检测到 GEMINI_API_KEY。请配置。")
+    st.error("❌ 未检测到 GEMINI_API_KEY。请在 secrets 中配置。")
     st.stop()
 
 @st.cache_resource
@@ -414,7 +414,7 @@ def tool3_materials():
                 st.rerun()
 
 # ==========================================
-# 工具 4：文章生成器 
+# 工具 4：文章生成器
 # ==========================================
 def tool4_article():
     st.title("✍️ 工具 4：文章生成器")
@@ -533,7 +533,7 @@ LOOP END
             st.markdown(st.session_state.t4_article_draft, unsafe_allow_html=True)
 
 # ==========================================
-# 工具 5：文章配图 + 一键发布 (单篇双通道版)
+# 工具 5：文章配图 + 一键发布 (单篇满血全量版)
 # ==========================================
 def tool5_publish():
     st.title("🚀 工具 5：文章配图 + 一键发布 (HF免绑卡白嫖版)")
@@ -542,41 +542,38 @@ def tool5_publish():
 
     st.subheader("第 1 步：配置所有 API 与凭证")
     c1, c2, c3 = st.columns(3)
-    with c1: w_url = st.text_input("WP URL (含 https)", value=get_config("WP_URL") or "")
-    with c2: w_user = st.text_input("WP User", value=get_config("WP_USER") or "")
-    with c3: w_pass = st.text_input("WP App Password", type="password", value=get_config("WP_APP_PASSWORD") or "")
+    with c1: w_url = st.text_input("WP URL (含 https)", value=get_config("WP_URL") or "", key="t5_wurl")
+    with c2: w_user = st.text_input("WP User", value=get_config("WP_USER") or "", key="t5_wuser")
+    with c3: w_pass = st.text_input("WP App Password", type="password", value=get_config("WP_APP_PASSWORD") or "", key="t5_wpass")
     
     st.markdown("#### 图片来源设置")
     img_source = st.selectbox("选择自动配图的渠道：", [
         "1. Pollinations.ai (极度白嫖：完全免费、免注册、免API Key)", 
         "2. Hugging Face (大厂免绑卡白嫖：SDXL顶级模型，只需邮箱免绑卡)"
-    ], index=1)
+    ], index=1, key="t5_source")
     
     hf_key = ""
     if "Hugging Face" in img_source:
-        hf_key = st.text_input("Hugging Face Access Token (必须填写)", type="password", value=get_config("HF_API_KEY") or "")
+        hf_key = st.text_input("Hugging Face Access Token (必须填写)", type="password", value=get_config("HF_API_KEY") or "", key="t5_hf_key")
         st.info("💡 请前往 Hugging Face 官网注册免费账号，并在 Settings -> Access Tokens 中创建一个 Token。")
 
     st.subheader("第 2 步：确认文章与背景")
-    persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.get('persona_en', ''), height=100)
-    md_input = st.text_area("粘贴 Markdown 文章全文 (包含占位符)：", value=st.session_state.get('t4_article_draft', ''), height=200)
+    persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.get('persona_en', ''), height=100, key="t5_persona")
+    md_input = st.text_area("粘贴 Markdown 文章全文 (包含占位符)：", value=st.session_state.get('t4_article_draft', ''), height=200, key="t5_md_input")
 
     st.subheader("第 3 步：全自动化处理 (AI配图 → WP上传 → SEO替换 → 脚注)")
     
-    if st.button("🌟 一键执行：全自动配图与深度优化", type="primary", use_container_width=True):
+    if st.button("🌟 一键执行：全自动配图与深度优化", type="primary", use_container_width=True, key="btn_t5_exec"):
         if not all([w_url, w_user, w_pass, md_input]):
             st.error("⚠️ 请填写完整的 WP凭证和文章内容！")
+            return
+        if "Hugging Face" in img_source and not hf_key:
+            st.error("⚠️ 您选择了 Hugging Face 出图，请务必填写 Access Token！")
             return
 
         wp_session = requests.Session()
         wp_session.auth = HTTPBasicAuth(w_user, w_pass)
         wp_session.headers.update({"User-Agent": "wp-android/23.3 (Android 13; en_US)", "Accept": "application/json"})
-
-        original_title = "AI Draft"
-        for line in md_input.split('\n'):
-            if line.startswith("# "):
-                original_title = line.replace("# ", "").strip()
-                break
 
         with st.spinner("1/4 正在让大模型提取 5 个专业配图 Prompt..."):
             p = f"""
@@ -634,12 +631,10 @@ Article Content:
                     if poll_resp.status_code != 200: raise Exception(f"Pollinations API Error: {poll_resp.status_code}")
                     img_bytes = poll_resp.content
                 else:
-                    # 💡 拥抱脸 Hugging Face 官方免费推理 API
                     r_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
                     r_head = {"Authorization": f"Bearer {hf_key}"}
                     r_data = {"inputs": pure_en_prompt}
                     
-                    # 带有重试机制，防止免费模型初次唤醒超时
                     for attempt in range(3):
                         r_resp = requests.post(r_url, headers=r_head, json=r_data)
                         if r_resp.status_code == 200:
@@ -664,7 +659,7 @@ Article Content:
                     raise Exception(f"WP 媒体库上传失败: {w_resp.text}")
             except Exception as e:
                 st.error(f"⚠️ 图片 {i+1} 处理崩溃: {str(e)[:100]}")
-                wp_urls.append("https://placehold.co/800x400.png?text=Image+Upload+Error") 
+                wp_urls.append(f"https://placehold.co/800x400.png?text=Image+Upload+Error") 
             progress_bar.progress((i + 1) / 5)
         
         status_txt.success("✅ 5 张图片已成功生成并上传到 WordPress 媒体库！")
@@ -712,8 +707,8 @@ Article Content:
             """
             st.session_state.t5_seo_markdown = model_flash.generate_content(seo_p, safety_settings=None).text
 
-        with st.spinner("4/4 最后一步：构建高级双向脚注系统..."):
-            fn_p = f"""
+        with st.spinner("4/4 最后一步：构建高级双向脚注系统 (严格全量 Prompt)..."):
+            fn_prompt = f"""
 ## Your Role
 
 You are an SEO expert responsible for enhancing articles by inserting relevant external links while maintaining readability, proper formatting, and structured footnotes in Markdown format.
@@ -767,15 +762,15 @@ You will receive an article in Markdown format.
 
 ✅ Correct:
 
-```markdown
+{chr(96)*3}markdown
 Certifications such as [ISO 9001](https://www.example.com) <sup>[1](#footnote-1){{#ref-1}}</sup> demonstrate a supplier’s commitment to quality management.
-```
+{chr(96)*3}
 
 ❌ Incorrect:
 
-```markdown
+{chr(96)*3}markdown
 Certifications such as [ISO 9001](https://www.example.com) [^1] demonstrate a supplier’s commitment to quality management.
-```
+{chr(96)*3}
 
 ---
 
@@ -785,7 +780,7 @@ At the end of the article, include a **Footnotes** section listing all 10 insert
 
 ✅ Markdown Example:
 
-```markdown
+{chr(96)*3}markdown
 ---
 ## Footnotes  
 
@@ -799,38 +794,511 @@ At the end of the article, include a **Footnotes** section listing all 10 insert
 <span id="footnote-8">8. Why supplier diversity strengthens global supply chains. [↩︎](#ref-8)</span>  
 <span id="footnote-9">9. Benefits of certifications for international trade compliance. [↩︎](#ref-9)</span>  
 <span id="footnote-10">10. Key trends in supplier risk management. [↩︎](#ref-10)</span>  
-```
+{chr(96)*3}
 
 [SYSTEM INSTRUCTION: OUTPUT THE FULL UPDATED MARKDOWN ARTICLE. Do not output code blocks around the article text, just the text itself.]
 
 Article to process:
 {st.session_state.t5_seo_markdown}
-"""
-st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
+            """
+            st.session_state.t5_final_markdown = model_flash.generate_content(fn_prompt, safety_settings=None).text
 
-# UI 渲染部分（脱离按钮触发作用域，确保页面刷新不丢失）
-if st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'):
-    st.subheader("第 4 步：检查并推送到网站")
-    with st.expander("👁️ 查看生成的 AI Prompt 历史"):
-        st.code(st.session_state.get('t5_img_prompts', ''), language="json")
+        st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
+
+    # UI 渲染部分（必须脱离 button 执行流）
+    if st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'):
+        st.subheader("第 4 步：检查并推送到网站")
+        with st.expander("👁️ 查看生成的 AI Prompt 历史"):
+            st.code(st.session_state.get('t5_img_prompts', ''), language="json")
+            
+        st.session_state.t5_final_markdown = st.text_area("最终 Markdown (所有图片已替换为您的网站图库链接)：", value=st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'), height=400, key="t5_final_output_box")
         
-    st.session_state.t5_final_markdown = st.text_area("最终 Markdown (所有图片已替换为您的网站图库链接)：", value=st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'), height=400)
+        status = st.selectbox("发布状态", ["draft", "publish"], key="t5_status_box")
+        if st.button("🚀 立即推送文章到 WordPress", type="primary", key="btn_publish_t5"):
+            with st.spinner("文章发布中..."):
+                try:
+                    # 💡 物理锁定：强制使用原文提取出来的原始标题，没收 AI 改名的权利
+                    title = "AI Draft"
+                    md_input_val = st.session_state.get('t4_article_draft', '')
+                    if md_input_val:
+                        for line in md_input_val.split('\n'):
+                            if line.startswith("# "):
+                                title = line.replace("# ", "").strip()
+                                break
+                    
+                    raw_content = st.session_state.t5_final_markdown.strip()
+                    
+                    # 💡 终极护盾：用 ASCII 字符规避复制时吞吃反引号导致的 SyntaxError
+                    md_block_1 = chr(96) * 3 + "markdown"
+                    md_block_2 = chr(96) * 3 + "md"
+                    md_block_3 = chr(96) * 3
+                    
+                    if raw_content.startswith(md_block_1): raw_content = raw_content[11:].strip()
+                    elif raw_content.startswith(md_block_2): raw_content = raw_content[5:].strip()
+                    elif raw_content.startswith(md_block_3): raw_content = raw_content[3:].strip()
+                    
+                    if raw_content.endswith(md_block_3): raw_content = raw_content[:-3].strip()
+
+                    # 裁掉正文里被 AI 保留的第一个 # 标题
+                    lines = raw_content.split('\n')
+                    if lines and lines[0].startswith("# "):
+                        lines.pop(0)
+                    final_content = "\n".join(lines).strip()
+                    
+                    wp_session = requests.Session()
+                    wp_session.auth = HTTPBasicAuth(w_user, w_pass)
+                    
+                    # 💡 特洛伊木马绕过法：发一个 10 字空壳绕过 LiteSpeed WAF 防火墙
+                    dummy_data = {"title": title, "content": "Initializing post structure...", "status": "draft"}
+                    r_dummy = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=dummy_data)
+                    
+                    if r_dummy.status_code == 201:
+                        post_id = r_dummy.json().get('id')
+                        st.info(f"🟢 空壳草稿创建成功 (ID: {post_id})，正在注入长文...")
+                        time.sleep(2)
+                        
+                        # 木马阶段 2：以 Update 的名义强行塞入 1500 字长文
+                        real_data = {"content": final_content, "status": status}
+                        r_update = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts/{post_id}", json=real_data)
+                        
+                        if r_update.status_code == 200:
+                            st.balloons()
+                            st.success(f"🎉 特洛伊注入发布成功！点击查看：[立即预览]({r_update.json().get('link')})")
+                        else: 
+                            st.error(f"❌ 长文注入失败 ({r_update.status_code}): {r_update.text}")
+                    else:
+                        st.error(f"❌ 连空壳草稿都被拦截 ({r_dummy.status_code}): {r_dummy.text}")
+                        
+                except Exception as e: st.error(f"网络报错: {e}")
+
+# ==========================================
+# 工具 7：全自动批量发布工具 (核心批量满血版)
+# ==========================================
+def tool7_batch_publish():
+    st.title("🤖 工具 7：全自动批量发布与排期 (HF免绑卡白嫖版)")
+    st.markdown("**🔥 终极效率工具**：全自动执行调研、长文、极速生图、WP图库上传、图片 SEO 与双向脚注系统。")
+    st.divider()
+
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        st.subheader("1. 基础素材配置")
+        persona_input = st.text_area("角色背景 (必填)：", value=st.session_state.get('persona_en', ''), height=150, key="t7_persona")
+        
+        # 💡 强力修复：确保话题框完全干净，每次执行前必须手动输入最新话题，杜绝乱跑旧话题
+        topics_input = st.text_area("粘贴批量话题 (每行一个，请务必清理并粘贴你想写的新话题)：", value="", height=200, key="t7_topics")
+
+    with col2:
+        st.subheader("2. API 与 WordPress 配置")
+        w_url = st.text_input("WP URL (含 https://)", value=get_config("WP_URL") or "", key="w_url_7")
+        w_user = st.text_input("WP 用户名", value=get_config("WP_USER") or "", key="w_user_7")
+        w_pass = st.text_input("WP 应用密码", type="password", value=get_config("WP_APP_PASSWORD") or "", key="w_pass_7")
+        
+        img_source = st.selectbox("选择自动配图的渠道：", [
+            "1. Pollinations.ai (极度白嫖：完全免费、免注册、免API Key)", 
+            "2. Hugging Face (大厂免绑卡白嫖：SDXL顶级模型，只需邮箱注册获取Token)"
+        ], index=1, key="img_src_7")
+        
+        hf_key = ""
+        if "Hugging Face" in img_source:
+            hf_key = st.text_input("Hugging Face Access Token (必须填)", type="password", value=get_config("HF_API_KEY") or "", key="hf_key_7")
+        
+        st.markdown("---")
+        start_date = st.date_input("排期开始日期", value=datetime.today(), key="t7_date")
+        posts_per_day = st.number_input("每天发布几篇文章？", min_value=1, max_value=10, value=2, key="t7_posts_day")
+
+    st.markdown("---")
     
-    status = st.selectbox("发布状态", ["draft", "publish"])
-    if st.button("🚀 立即推送文章到 WordPress", type="primary"):
-        with st.spinner("文章发布中..."):
+    if st.button("🚀 确认无误，开始全自动批量执行", type="primary", use_container_width=True, key="btn_t7_exec"):
+        topics = [t.strip() for t in topics_input.split('\n') if t.strip()]
+        if not topics:
+            st.error("⚠️ 请在文本框中粘贴至少一个话题！")
+            return
+        if not persona_input or not all([w_url, w_user, w_pass]):
+            st.error("⚠️ 请确保填完了背景和 WordPress 凭证！")
+            return
+        if "Hugging Face" in img_source and not hf_key:
+            st.error("⚠️ 您选择了 Hugging Face 出图，请务必填写 Access Token！")
+            return
+            
+        st.success(f"初始化成功！共检测到 {len(topics)} 个任务。即将开始...")
+        
+        progress_bar = st.progress(0)
+        status_box = st.empty()
+        log_box = st.empty()
+        logs = []
+        
+        interval_hours = 24 / posts_per_day
+        current_schedule_time = datetime.combine(start_date, datetime.min.time()) + timedelta(hours=8)
+        
+        wp_session = requests.Session()
+        wp_session.auth = HTTPBasicAuth(w_user, w_pass)
+        wp_session.headers.update({
+            "User-Agent": "wp-android/23.3 (Android 13; en_US)",
+            "Accept": "application/json"
+        })
+        
+        for idx, topic in enumerate(topics):
+            status_box.info(f"🔄 **正在处理第 {idx+1}/{len(topics)} 篇**: {topic}")
             try:
-                # 💡 物理锁定：强制使用在第二步中提取的原始标题
-                title = "AI Draft"
-                md_input_val = st.session_state.get('t4_article_draft', '')
-                for line in md_input_val.split('\n'):
-                    if line.startswith("# "):
-                        title = line.replace("# ", "").strip()
-                        break
+                # ==================================
+                # 步骤 A: 调研
+                # ==================================
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🔍 开始深度调研...")
+                log_box.code("\n".join(logs[-5:]))
                 
-                raw_content = st.session_state.t5_final_markdown.strip()
+                research_p = f"""
+我会给你一个问题，请你帮我生成 10 条英文见解。 
+问题（话题）：{topic}
+
+要求： 
+1. 你要基于 Google SERP 排名前 10 的自然搜索页面，提炼出 6 条明确提到的关键见解。 
+2. 再补充 4 条不在前 10 页中出现，但基于其他可靠信息或逻辑推理得出的见解。 
+3. 总共输出 10 条见解。 
+4. 只输出见解内容，不要提到数据来源、研究过程，也不要写解释性文字。 
+5. 输出必须是英文，每条见解简洁、事实化。
+
+---
+【系统排版要求】：为了衔接下一个写作工具，请在输出上述 10 条见解的同时，顺便提供 4 个相关的英文二级标题 (H2)。并严格按照以下固定格式输出（必须保留前面的星号标签）：
+
+*二级标题：
+* [H2 1]
+* [H2 2]
+* [H2 3]
+* [H2 4]
+*AI见解：
+1. [见解 1]
+2. [见解 2]
+3. [见解 3]
+4. [见解 4]
+5. [见解 5]
+6. [见解 6]
+7. [见解 7]
+8. [见解 8]
+9. [见解 9]
+10. [见解 10]
+                """
+                ai_insights = model_flash.generate_content(research_p, safety_settings=None).text
+                time.sleep(2)
                 
-                # 💡 终极护盾：用 ASCII 字符规避复制时吞吃反引号导致的 SyntaxError
+                # ==================================
+                # 步骤 B: 撰写 1500 字长文
+                # ==================================
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] ✍️ 撰写 1500 字长文...")
+                log_box.code("\n".join(logs[-5:]))
+                
+                write_p = f"""
+# Your Role:
+你是一个我写博客文章的枪手，你会使用我的口吻，用Markdown语言输出指定格式的博客文章。
+
+# Your Responsibilities:
+当我输入如下格式的内容给你时:
+{ai_insights}
+
+你按照如下的格式输出一篇文章给我：
+
+# 这里是文章的主标题，以问号结尾
+
+[图片占位符]
+
+Leading paragraph:
+开头第一段，会使用PAS策略，吸引读者注意力，在这一段里使用第一人称的语气。(Max 30 words)
+
+Featured paragraph:
+**开头第二段，回答标题提出的问题，这个段落，后面会用来竞争谷歌的精选摘要。** (Min 30 words and Max 50 words)
+
+Transition paragraph:
+承上启下的段落，会挽留客户继续往下阅读。
+
+LOOP START
+
+## 我输入给你的二级标题，也是以问号结尾
+
+Leading paragraph:
+开头第一段，会使用PAS策略，吸引读者注意力，在这一段里使用第一人称的语气。(Max 30 words)
+
+Featured paragraph:
+**开头第二段，回答标题提出的问题，这个段落，后面会用来竞争谷歌的精选摘要。** (Min 30 words and Max 50 words)
+
+[图片占位符]
+
+Dive deeper paragraph:
+根据二级标题，继续延展和深入，可以用批判性思维，来拆分问题，帮助读者更加深入地理解。(Min 200 words)
+
+LOOP END
+
+## Conclusion
+
+写一段结论，总结全文。(Max 30 words)
+
+## My Role:
+{persona_input}
+
+# My Requirements:
+1. 文章的长度，不得少于1500个单词，文章的每个Dive deeper paragraph，都不得少于200个单词；
+2. 全文除了所有的Featured paragraphs必须使用第一人称的口吻进行写作，在必要时补充个人故事（我会稍后替换）；
+3. 在二级标题之下的段落中，当进行Dive deeper paragraph写作时，多穿插一些必要的Markdown格式的H3s和表格；
+4. 写作风格介于书面学术写作和口语描述之间，所有句子都有主语，使用Plain English和简单词汇，让高中学生也能读懂，不要用复杂的长难句，不要用复杂、高级、生僻的词汇，尽可能用短句输出，替换掉非日常的词汇；
+5. 将所有句子中过渡词和连接词替换成最基础，最常用的词语，尽可能试试简单的、直接的表达方式，避免使用复杂或生僻的词汇。保证句子的逻辑关系清晰，不要主动添加任何总结（除非文章最后的Conslusion部分）；
+6. 你输出给我的内容不能包含任何Leading paragraph:、Featured paragraph:、Transition paragraph:、Dive deeper paragraph:
+、LOOP START、LOOP END这些或类似于这些的解释性文本；
+7. 图片占位符用以下链接表示：![alt with keywords]("https://placehold.co/600x400.jpg")
+8. 文章默认使用英语输出；
+9. 你输出给我的文章，必须转换成Markdown格式；
+10. 你输出给我的内容，必须包含3个表格。
+11. 在每个二级标题下的Featured paragraph下边的位置生成图片占位符。
+12. 在每个二级标题下的图片占位符之下的位置都要生成Dive deeper paragraph。
+                """
+                article_md = model_flash.generate_content(write_p, safety_settings=None).text
+                time.sleep(3)
+                
+                # ==================================
+                # 步骤 C1: 提取 AI 提示词并画图
+                # ==================================
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🎨 提取提示词并开始云端作图...")
+                log_box.code("\n".join(logs[-5:]))
+                
+                img_prompt_req = f"""
+Your Role:
+You will generate AI image generation prompts for illustrations that accompany my blog articles.
+
+Your Responsibilities:
+When I provide you with the content of a blog article, you must generate five image generation prompts that accurately match the meaning or scenario described in the input.
+
+Each prompt must follow these guidelines:
+1. Start each prompt with a concise Chinese title that summarizes the scene depicted. Ensure the title is clearly separated from the prompt text and does not mix with it.
+2. Each prompt must be at least 70 words long and written in clear, specific English. Avoid vague descriptions.
+3. Each prompt should provide a detailed description of the image, including:
+• Objects, people, and scene elements
+• Colors, lighting, and atmosphere
+• Perspective (e.g., close-up shot, wide-angle, aerial view, etc.)
+• Possible artistic style (e.g., photography, 3D render, digital illustration, etc.)
+
+## My Role:
+{persona_input}
+
+My Requirements (Output Guidelines)
+1. All prompts must be written in English.
+2. Each prompt must be at least 70 words long.
+3. Each prompt must begin with a Chinese title summarizing the scene, ensuring it is distinct from the prompt itself.
+4. The prompts must be precise and vivid, aligned with my industry background. Avoid vague descriptions.
+
+[SYSTEM CRITICAL INSTRUCTION]: You MUST output the final result strictly as a valid JSON array containing exactly 5 strings. Do not include any markdown formatting like {chr(96)*3}json.
+Example: ["Title 1 prompt...", "Title 2 prompt...", "Title 3 prompt...", "Title 4 prompt...", "Title 5 prompt..."]
+
+Article Content:
+{article_md}
+                """
+                res = model_flash.generate_content(img_prompt_req, safety_settings=None, generation_config={"response_mime_type": "application/json"}).text
+                
+                try:
+                    img_prompts_list = json.loads(res)
+                except Exception as e:
+                    logs.append(f"❌ JSON 解析崩溃: {e}")
+                    log_box.code("\n".join(logs[-5:]))
+                    raise Exception("Prompt Parsing Failed")
+
+                wp_urls = []
+                for i, p_text in enumerate(img_prompts_list[:5]): 
+                    pure_en_prompt = p_text.split("\n")[-1] if "\n" in p_text else p_text
+                    try:
+                        if "Pollinations" in img_source:
+                            safe_prompt = urllib.parse.quote(pure_en_prompt)
+                            img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1024&height=768&nologo=true"
+                            poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                            poll_resp = requests.get(img_url, headers=poll_head, timeout=45)
+                            if poll_resp.status_code != 200: raise Exception(f"Pollinations API Error: {poll_resp.status_code}")
+                            img_bytes = poll_resp.content
+                        else:
+                            # 💡 Hugging Face 官方免费推理 API
+                            r_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+                            r_head = {"Authorization": f"Bearer {hf_key}"}
+                            r_data = {"inputs": pure_en_prompt}
+                            
+                            for attempt in range(3):
+                                r_resp = requests.post(r_url, headers=r_head, json=r_data)
+                                if r_resp.status_code == 200:
+                                    img_bytes = r_resp.content
+                                    break
+                                elif r_resp.status_code == 503:
+                                    time.sleep(10)
+                                else:
+                                    raise Exception(f"Hugging Face 报错: {r_resp.text}")
+                            else:
+                                raise Exception("Hugging Face 模型加载超时")
+
+                        wp_media_url = f"{w_url.rstrip('/')}/wp-json/wp/v2/media"
+                        wp_head = {
+                            "Content-Disposition": f'attachment; filename="auto-img-{int(time.time())}-{i+1}.jpg"', 
+                            "Content-Type": "image/jpeg"
+                        }
+                        w_resp = wp_session.post(wp_media_url, headers=wp_head, data=img_bytes)
+                        if w_resp.status_code == 201:
+                            wp_urls.append(w_resp.json().get('source_url'))
+                        else:
+                            raise Exception(f"WP Upload failed: {w_resp.text}")
+                    except Exception as e:
+                        logs.append(f"⚠️ 图片 {i+1} 崩溃: {str(e)[:100]}")
+                        log_box.code("\n".join(logs[-5:]))
+                        wp_urls.append(f"https://placehold.co/800x400.png?text=Error+{i+1}") 
+                        
+                # ==================================
+                # 步骤 C2: 图片 SEO
+                # ==================================
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🖼️ 注入文章并执行 SEO...")
+                log_box.code("\n".join(logs[-5:]))
+                
+                seo_prompt = f"""
+Your Role:
+
+You are an SEO expert specializing in image SEO optimization to enhance search engine visibility for my website.
+
+Your Responsibilities:
+
+Each time I upload one or multiple images, you must generate SEO-optimized metadata for each image in the following Markdown format:
+
+![Alternative text, concise image description (≤15 words)](#placeholder_link "Title text (≤5 words)")
+
+Key Formatting Rules:
+1. Alternative Text (Alt Text):
+• Describe the image concisely in 15 words or fewer.
+• Make it descriptive and meaningful for both SEO and accessibility.
+2. Title Text:
+• Keep it 5 words or fewer.
+• It should be a short, catchy phrase that enhances the image’s SEO relevance.
+3. Direct Integration (CRITICAL):
+• Each image’s metadata must be presented on a separate line.
+• Do NOT wrap the image tag in a code block ({chr(96)*3}markdown). Embed it directly into the article text so the image renders natively in WordPress.
+
+My Requirements (Output Guidelines)
+1. All outputs must be in English.
+2. DO NOT wrap the output or the images inside a code block. 
+3. Each image must have a separate SEO-optimized Alt Text and Title Text following the specified format.
+4. Ensure descriptions are relevant to my industry and improve SEO rankings for my website.
+
+[SYSTEM CRITICAL INSTRUCTION]: You MUST replace all `[Image X]` placeholders or existing image tags in the article with the REAL WordPress URLs provided below. OUTPUT THE FULL UPDATED MARKDOWN ARTICLE. Do not output code blocks around the article text or around the images.
+
+REAL WordPress URLs to use sequentially:
+1. {wp_urls[0] if len(wp_urls) > 0 else 'https://placehold.co/600'}
+2. {wp_urls[1] if len(wp_urls) > 1 else 'https://placehold.co/600'}
+3. {wp_urls[2] if len(wp_urls) > 2 else 'https://placehold.co/600'}
+4. {wp_urls[3] if len(wp_urls) > 3 else 'https://placehold.co/600'}
+5. {wp_urls[4] if len(wp_urls) > 4 else 'https://placehold.co/600'}
+
+Article Content:
+{article_md}
+                """
+                seo_md = model_flash.generate_content(seo_prompt, safety_settings=None).text
+                time.sleep(2)
+
+                # ==================================
+                # 步骤 C3: 双向脚注
+                # ==================================
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🔗 构建双向脚注系统...")
+                log_box.code("\n".join(logs[-5:]))
+                
+                fn_prompt = f"""
+## Your Role
+
+You are an SEO expert responsible for enhancing articles by inserting relevant external links while maintaining readability, proper formatting, and structured footnotes in Markdown format.
+
+## Your Responsibilities
+
+### Input
+
+You will receive an article in Markdown format.
+
+### Output Guidelines
+
+1. **Identify Key Phrases for Hyperlinking**
+
+   * Select meaningful noun phrases that require additional explanation or supporting data.
+   * Do not hyperlink single words; instead, choose context-rich phrases that fit naturally within the content.
+   * Exclude bolded paragraphs from hyperlinking.
+
+2. **Insert Hyperlinks Correctly**
+
+   * Embed links directly within the content using Markdown format (e.g., `[ISO 9001](https://www.example.com)`).
+   * Avoid adding separate footnotes within bolded paragraphs.
+   * Display the footnote number as an **upward superscript digit** using `<sup>` (e.g., `[ISO 9001](https://www.example.com) <sup>[1](#footnote-1){{#ref-1}}</sup>`).
+
+3. **Ensure Proper Footnote Usage**
+
+   * Do **not** use Markdown Extra’s `[^1]` syntax. Instead, implement a **manual bidirectional system**:
+
+     * In the main text: `<sup>[1](#footnote-1){{#ref-1}}</sup>`
+     * In the footnotes: `<span id="footnote-1">1. Short explanation. [↩︎](#ref-1)</span>`
+   * At the bottom of the article, create a **“Footnotes”** section listing all referenced links.
+   * Each footnote should include a concise explanation (max 20 words) of why users should visit the link.
+   * After each footnote entry, add a **return link `[↩︎]`** that navigates back to the corresponding keyword in the main text.
+   * Each footnote number must be unique and non-repetitive to ensure accurate linking.
+
+4. **Maintain Consistency and Readability**
+
+   * Each article must contain **exactly ten external links** — no more, no less.
+   * No duplicate key phrases should be hyperlinked.
+   * The selected phrases should be seamlessly integrated within the article to maintain smooth readability.
+
+5. **Ensure Markdown Formatting for Output**
+
+   * The final output must be in **Markdown format** after inserting hyperlinks and footnotes.
+   * You may use minimal HTML tags (`<sup>`, `<span>`) to enable superscripts and anchor navigation.
+   * Avoid unnecessary HTML to ensure compatibility across Markdown-based platforms.
+
+---
+
+## Example Formatting
+
+✅ Correct:
+
+{chr(96)*3}markdown
+Certifications such as [ISO 9001](https://www.example.com) <sup>[1](#footnote-1){{#ref-1}}</sup> demonstrate a supplier’s commitment to quality management.
+{chr(96)*3}
+
+❌ Incorrect:
+
+{chr(96)*3}markdown
+Certifications such as [ISO 9001](https://www.example.com) [^1] demonstrate a supplier’s commitment to quality management.
+{chr(96)*3}
+
+---
+
+## Footnotes Formatting
+
+At the end of the article, include a **Footnotes** section listing all 10 inserted links along with a short explanation and return link.
+
+✅ Markdown Example:
+
+{chr(96)*3}markdown
+---
+## Footnotes  
+
+<span id="footnote-1">1. Learn how ISO 9001 ensures consistent quality standards. [↩︎](#ref-1)</span>  
+<span id="footnote-2">2. Guide to analyzing customer reviews for supplier reliability. [↩︎](#ref-2)</span>  
+<span id="footnote-3">3. Role of third-party verification in supplier compliance. [↩︎](#ref-3)</span>  
+<span id="footnote-4">4. Insights into cost-effective logistics for supply chains. [↩︎](#ref-4)</span>  
+<span id="footnote-5">5. How trade policies affect procurement strategies. [↩︎](#ref-5)</span>  
+<span id="footnote-6">6. Explanation of sustainable sourcing practices. [↩︎](#ref-6)</span>  
+<span id="footnote-7">7. Impact of digital tools on supplier evaluation. [↩︎](#ref-7)</span>  
+<span id="footnote-8">8. Why supplier diversity strengthens global supply chains. [↩︎](#ref-8)</span>  
+<span id="footnote-9">9. Benefits of certifications for international trade compliance. [↩︎](#ref-9)</span>  
+<span id="footnote-10">10. Key trends in supplier risk management. [↩︎](#ref-10)</span>  
+{chr(96)*3}
+
+[SYSTEM INSTRUCTION: OUTPUT THE FULL UPDATED MARKDOWN ARTICLE. Do not output code blocks around the article text, just the text itself.]
+
+Article to process:
+{seo_md}
+                """
+                final_md = model_flash.generate_content(fn_prompt, safety_settings=None).text
+                
+                # ==================================
+                # 步骤 D: WP 排期发布 (特洛伊木马绕过)
+                # ==================================
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🌐 推送到 WordPress 排期...")
+                log_box.code("\n".join(logs[-5:]))
+                
+                raw_content = final_md.strip()
+                
                 md_block_1 = chr(96) * 3 + "markdown"
                 md_block_2 = chr(96) * 3 + "md"
                 md_block_3 = chr(96) * 3
@@ -838,37 +1306,65 @@ if st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_mar
                 if raw_content.startswith(md_block_1): raw_content = raw_content[11:].strip()
                 elif raw_content.startswith(md_block_2): raw_content = raw_content[5:].strip()
                 elif raw_content.startswith(md_block_3): raw_content = raw_content[3:].strip()
-                
                 if raw_content.endswith(md_block_3): raw_content = raw_content[:-3].strip()
 
-                # 裁掉正文里被 AI 保留的第一个 # 标题
                 lines = raw_content.split('\n')
                 if lines and lines[0].startswith("# "):
                     lines.pop(0)
-                final_content = "\n".join(lines).strip()
                 
-                wp_session = requests.Session()
-                wp_session.auth = HTTPBasicAuth(w_user, w_pass)
+                final_md_clean = "\n".join(lines).strip()
+                title = topic 
+                schedule_iso = current_schedule_time.strftime("%Y-%m-%dT%H:%M:%S")
                 
-                # 💡 特洛伊木马绕过法：发一个空壳绕过 LiteSpeed WAF 防火墙
+                # 💡 木马计步骤 1：空壳绕过长文防火墙
                 dummy_data = {"title": title, "content": "Initializing post structure...", "status": "draft"}
                 r_dummy = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=dummy_data)
                 
                 if r_dummy.status_code == 201:
                     post_id = r_dummy.json().get('id')
-                    st.info(f"🟢 空壳草稿创建成功 (ID: {post_id})，正在注入长文...")
+                    logs.append(f"🟢 空壳草稿创建成功 (ID: {post_id})，正在注入长文...")
+                    log_box.code("\n".join(logs[-5:]))
                     time.sleep(2)
                     
-                    # 木马阶段 2：以 Update 的名义强行塞入长文
-                    real_data = {"content": final_content, "status": status}
+                    # 💡 木马计步骤 2：强行注入长文并排期
+                    real_data = {"content": final_md_clean, "status": "future", "date": schedule_iso}
                     r_update = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts/{post_id}", json=real_data)
                     
                     if r_update.status_code == 200:
-                        st.balloons()
-                        st.success(f"🎉 特洛伊注入发布成功！点击查看：[立即预览]({r_update.json().get('link')})")
+                        logs.append(f"✅ 成功！已排期至 {schedule_iso}")
                     else: 
-                        st.error(f"❌ 长文注入失败 ({r_update.status_code}): {r_update.text}")
+                        logs.append(f"❌ 长文注入失败: {r_update.text}")
                 else:
-                    st.error(f"❌ 连空壳草稿都被拦截 ({r_dummy.status_code}): {r_dummy.text}")
-                    
-            except Exception as e: st.error(f"网络报错: {e}")
+                    logs.append(f"❌ 连空壳草稿都被拦截: {r_dummy.text}")
+                
+                log_box.code("\n".join(logs[-5:]))
+                current_schedule_time += timedelta(hours=interval_hours)
+                time.sleep(10)
+                
+            except Exception as e:
+                logs.append(f"⚠️ 发生错误，跳过此篇: {e}")
+                log_box.code("\n".join(logs[-5:]))
+                time.sleep(15) 
+                continue
+            
+            progress_bar.progress((idx + 1) / len(topics))
+            
+        status_box.success(f"🎉 批量任务全部执行完毕！")
+
+# ==========================================
+# 左侧主控导航菜单
+# ==========================================
+with st.sidebar:
+    st.title("⚙️ AI Writer 工业化中心")
+    st.caption("版本: 2026 满血防弹全量版")
+    page = st.radio("系统功能导航", [
+        "1. 创建角色背景", "2. 文章话题生成器", "3. 写文章原材料",
+        "4. 文章生成器", "5. 文章配图 + 一键发布", "7. 批量发布工具 ⭐"
+    ])
+
+if page.startswith("1"): tool1_persona()
+elif page.startswith("2"): tool2_topics()
+elif page.startswith("3"): tool3_materials()
+elif page.startswith("4"): tool4_article()
+elif page.startswith("5"): tool5_publish()
+elif page.startswith("7"): tool7_batch_publish()
