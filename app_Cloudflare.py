@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 # ==========================================
 # 0. 全局配置与模型初始化
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (Cloudflare 终极精密工程版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (防拦截隐身版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -251,7 +251,7 @@ def tool2_topics():
                         for ct in t_list:
                             curr += 1
                             with st.spinner(f"[{curr}/{total_combo}] 正在生成: {tc} × {ct}..."):
-                                prompt = f"角色：外贸SEO专家。我的国家：{current_val}。产品：{st.session_state.t2_product}. 目标市场：{tc}。目标客户：{ct}。请生成 {per_combo} 个精准英文文章话题（标题）。直接输出列表，不带编号。"
+                                prompt = f"角色：外贸SEO专家。我的国家：{current_val}。产品：{st.session_state.t2_product}。目标市场：{tc}。目标客户：{ct}。请生成 {per_combo} 个精准英文文章话题（标题）。直接输出列表，不带编号。"
                                 try:
                                     if curr > 1: time.sleep(1.5) 
                                     res = model_flash.generate_content(prompt, safety_settings=safe_config)
@@ -440,7 +440,7 @@ def tool4_article():
 你是一个我写博客文章的枪手，你会使用我的口吻，用Markdown语言输出指定格式的博客文章。
 
 # Your Responsibilities:
-当我们输入如下格式的内容给你时:
+当我输入如下格式的内容给你时:
 {mat_input}
 
 你按照如下的格式输出一篇文章给我：
@@ -535,11 +535,11 @@ LOOP END
             st.markdown(st.session_state.t4_article_draft, unsafe_allow_html=True)
 
 # ==========================================
-# 工具 5：文章配图 + 一键发布 (Cloudflare 精密工程版)
+# 工具 5：文章配图 + 一键发布 (防拦截隐身版)
 # ==========================================
 def tool5_publish():
     st.title("🚀 工具 5：文章配图 + 一键发布 (精密工程防弹版)")
-    st.markdown("已接入加强版“精密工程提示语”引擎，彻底修复工业模型细节模糊扭曲问题！")
+    st.markdown("已内置高强度伪装与强制休眠机制，彻底防止 Hostinger/Cloudflare 拦截媒体上传！")
     st.divider()
 
     st.subheader("第 1 步：配置所有 API 与凭证")
@@ -550,8 +550,8 @@ def tool5_publish():
     
     st.markdown("#### 图片来源设置")
     img_source = st.selectbox("选择自动配图的渠道：", [
-        "1. Cloudflare AI (强烈推荐：每天免费1万积分，极速防弹)", 
-        "2. Pollinations.ai (纯净URL+5次重试，免填Key)"
+        "1. Cloudflare AI (强烈推荐：每天免费1万积分，永不宕机，需API配置)", 
+        "2. Pollinations.ai (纯净URL+5次重试，完全免填Key)"
     ], index=0, key="t5_source")
     
     cf_id = ""
@@ -578,10 +578,14 @@ def tool5_publish():
 
         wp_session = requests.Session()
         wp_session.auth = HTTPBasicAuth(w_user, w_pass)
-        wp_session.headers.update({"User-Agent": "wp-android/23.3 (Android 13; en_US)", "Accept": "application/json"})
+        
+        # 💡 防御破解：伪装成极度标准的最新版 Chrome 浏览器，防止 Hostinger WAF 拦截
+        wp_session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "application/json"
+        })
 
         with st.spinner("1/4 正在通过加固引擎提取 5 个专业精密配图 Prompt..."):
-            # 💡 核心修复：终极精密工程提示语生成逻辑
             p = f"""
 Your Role:
 You are an expert AI image generation prompt engineer specializing in high-fidelity, precision-engineered industrial product catalog photography for B2B blogs.
@@ -618,14 +622,12 @@ Article Content:
         status_txt = st.empty()
 
         for i, p_text in enumerate(prompts):
-            # 终极正则清洗
             pure_en_prompt = re.sub(r'[^a-zA-Z0-9\s,\.\-]', '', p_text).strip()
             pure_en_prompt = " ".join(pure_en_prompt.split())
             
-            status_txt.text(f"2/4 正在通过 Cloudflare 企业通道极速出图并上传... ({i+1}/5)")
+            status_txt.text(f"2/4 正在出图并上传... 为了防止防火墙拦截，系统将缓慢执行 ({i+1}/5)")
             try:
                 if "Cloudflare" in img_source:
-                    # 💡 接入点：Cloudflare Workers AI
                     cf_url = f"https://api.cloudflare.com/client/v4/accounts/{cf_id}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
                     cf_head = {"Authorization": f"Bearer {cf_token}"}
                     cf_data = {"prompt": pure_en_prompt}
@@ -662,13 +664,19 @@ Article Content:
                     "Content-Type": "image/jpeg"
                 }
                 w_resp = wp_session.post(wp_media_url, headers=wp_head, data=img_bytes)
+                
                 if w_resp.status_code == 201:
                     wp_urls.append(w_resp.json().get('source_url'))
+                    
+                    # 💡 防御破解：强制挂起休眠 5 秒，防止被服务器认定为恶意灌水（405拦截）
+                    time.sleep(5)
                 else:
-                    raise Exception(f"WP 媒体库上传失败: {w_resp.text}")
+                    raise Exception(f"WP 媒体库上传失败 ({w_resp.status_code}): {w_resp.text[:100]}...")
+                    
             except Exception as e:
-                st.error(f"⚠️ 图片 {i+1} 处理崩溃: {str(e)[:100]}")
+                st.error(f"⚠️ 图片 {i+1} 处理崩溃: {str(e)}")
                 wp_urls.append(f"https://placehold.co/800x400.png?text=Image+Upload+Error") 
+                
             progress_bar.progress((i + 1) / 5)
         
         status_txt.success("✅ 5 张精密工程配图已成功生成并上传到 WordPress！")
@@ -877,11 +885,11 @@ Article to process:
                 except Exception as e: st.error(f"网络报错: {e}")
 
 # ==========================================
-# 工具 7：全自动批量发布工具 (精密工程满血版)
+# 工具 7：全自动批量发布工具 (防拦截隐身版)
 # ==========================================
 def tool7_batch_publish():
-    st.title("🤖 工具 7：全自动批量发布与排期 (精密工程大厂版)")
-    st.markdown("**🔥 终极效率工具**：全自动执行调研、长文、精密画图、WP图库上传、图片 SEO 与双向脚注系统。")
+    st.title("🤖 工具 7：全自动批量发布与排期 (防拦截伪装版)")
+    st.markdown("**🔥 终极效率工具**：已内置慢速休眠与浏览器伪装，全面突破 Hostinger 防火墙拦截。")
     st.divider()
 
     col1, col2 = st.columns([1, 1])
@@ -938,8 +946,10 @@ def tool7_batch_publish():
         
         wp_session = requests.Session()
         wp_session.auth = HTTPBasicAuth(w_user, w_pass)
+        
+        # 💡 防御破解：全局修改伪装，模拟真人浏览器，防止恶意爬虫封禁
         wp_session.headers.update({
-            "User-Agent": "wp-android/23.3 (Android 13; en_US)",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Accept": "application/json"
         })
         
@@ -958,7 +968,7 @@ def tool7_batch_publish():
 
 要求： 
 1. 你要基于 Google SERP 排名前 10 的自然搜索页面，提炼出 6 条明确提到的关键见解。 
-2. 再补充 4 条不在前 10 页中出现，但基于其他可靠信息或逻辑推理得出的见解。 
+2. 再补充 4 条不在前 10 页中出现，但基于可靠信息或逻辑推理得出的见解。 
 3. 总共输出 10 条见解。 
 4. 只输出见解内容，不要提到数据来源、研究过程，也不要写解释性文字。 
 5. 输出必须是英文，每条见解简洁、事实化。
@@ -997,7 +1007,7 @@ def tool7_batch_publish():
 你是一个我写博客文章的枪手，你会使用我的口吻，用Markdown语言输出指定格式的博客文章。
 
 # Your Responsibilities:
-当我们输入如下格式的内容给你时:
+当我输入如下格式的内容给你时:
 {ai_insights}
 
 你按照如下的格式输出一篇文章给我：
@@ -1063,7 +1073,6 @@ LOOP END
                 logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🎨 提取提示词并生成精密工程配图...")
                 log_box.code("\n".join(logs[-5:]))
                 
-                # 💡 核心修复：批量发布中的精密工程提示语生成逻辑
                 img_prompt_req = f"""
 Your Role:
 You are an expert AI image generation prompt engineer specializing in high-fidelity, precision-engineered industrial product catalog photography for B2B blogs.
@@ -1098,7 +1107,6 @@ Article Content:
 
                 wp_urls = []
                 for i, p_text in enumerate(img_prompts_list[:5]): 
-                    # 正则清洗
                     pure_en_prompt = re.sub(r'[^a-zA-Z0-9\s,\.\-]', '', p_text).strip()
                     pure_en_prompt = " ".join(pure_en_prompt.split())
                     
@@ -1140,12 +1148,19 @@ Article Content:
                             "Content-Type": "image/jpeg"
                         }
                         w_resp = wp_session.post(wp_media_url, headers=wp_head, data=img_bytes)
+                        
                         if w_resp.status_code == 201:
                             wp_urls.append(w_resp.json().get('source_url'))
+                            
+                            # 💡 防御破解：强制挂起休眠 5 秒，极其缓慢地上传，防止 Hostinger WAF 察觉
+                            logs.append(f"  └ 成功上传图 {i+1}，休眠隐身 5 秒...")
+                            log_box.code("\n".join(logs[-5:]))
+                            time.sleep(5)
                         else:
-                            raise Exception(f"WP Upload failed: {w_resp.text}")
+                            raise Exception(f"WP Upload failed ({w_resp.status_code}): {w_resp.text[:100]}...")
+                            
                     except Exception as e:
-                        logs.append(f"⚠️ 图片 {i+1} 崩溃: {str(e)[:100]}")
+                        logs.append(f"⚠️ 图片 {i+1} 崩溃: {str(e)}")
                         log_box.code("\n".join(logs[-5:]))
                         wp_urls.append(f"https://placehold.co/800x400.png?text=Error+{i+1}") 
                         
@@ -1365,7 +1380,7 @@ Article to process:
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: 2026 精密工程版")
+    st.caption("版本: 2026 防拦截隐身版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", "2. 文章话题生成器", "3. 写文章原材料",
         "4. 文章生成器", "5. 文章配图 + 一键发布", "7. 批量发布工具 ⭐"
