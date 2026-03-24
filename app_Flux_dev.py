@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 # ==========================================
 # 0. 全局配置与模型初始化
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (OhMyGPT 深度冷却版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (OhMyGPT DALL-E 3 满血版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -535,11 +535,11 @@ LOOP END
             st.markdown(st.session_state.t4_article_draft, unsafe_allow_html=True)
 
 # ==========================================
-# 工具 5：文章配图 + 一键发布 (OhMyGPT 中转版)
+# 工具 5：文章配图 + 一键发布 (OhMyGPT DALL-E 3版)
 # ==========================================
 def tool5_publish():
-    st.title("🚀 工具 5：文章配图 + 一键发布 (OhMyGPT 深度冷却版)")
-    st.markdown("已接入 OhMyGPT 接口，内置深度冷却休眠机制避免触发并发与频率限制！")
+    st.title("🚀 工具 5：文章配图 + 一键发布 (OhMyGPT DALL-E 3 满血版)")
+    st.markdown("已切换至顶级 DALL-E 3 模型，画质拉满，彻底解决报错！")
     st.divider()
 
     st.subheader("第 1 步：配置所有 API 与凭证")
@@ -550,17 +550,18 @@ def tool5_publish():
     
     st.markdown("#### 图片来源设置")
     img_source = st.selectbox("选择自动配图的渠道：", [
-        "1. OhMyGPT (强烈推荐：FLUX顶级画质，支持支付宝充值)", 
+        "1. OhMyGPT (强烈推荐：DALL-E 3 顶级画质，支持支付宝充值)", 
         "2. Cloudflare AI (免费白嫖，但画质稍弱)", 
         "3. Pollinations.ai (免费免Key)"
     ], index=0, key="t5_source")
     
-    omg_base_url, omg_key, omg_model = "", "", "flux-schnell"
+    omg_base_url, omg_key, omg_model = "", "", "dall-e-3"
     if "OhMyGPT" in img_source:
         col_omg1, col_omg2, col_omg3 = st.columns(3)
         with col_omg1: omg_base_url = st.text_input("OhMyGPT 接口地址", value="https://api.ohmygpt.com/v1", key="t5_omg_url")
         with col_omg2: omg_key = st.text_input("OhMyGPT API Key", type="password", key="t5_omg_key")
-        with col_omg3: omg_model = st.text_input("模型名称", value="flux-schnell", key="t5_omg_model")
+        # 💡 核心修改：默认模型名改为 dall-e-3
+        with col_omg3: omg_model = st.text_input("模型名称", value="dall-e-3", key="t5_omg_model")
 
     st.subheader("第 2 步：确认文章与背景")
     persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.get('persona_en', ''), height=100, key="t5_persona")
@@ -626,10 +627,8 @@ Article Content:
             status_txt.text(f"2/4 正在通过 {img_source.split(' ')[1]} 出图并缓慢上传防拦截... ({i+1}/5)")
             try:
                 if "OhMyGPT" in img_source:
-                    # 💡 核心防御：强制深度休眠 25 秒，杜绝并发越界
-                    if i > 0:
-                        status_txt.text(f"2/4 正在出图... 深度冷却 25 秒防限速 ({i+1}/5)")
-                        time.sleep(25) 
+                    if i > 0: 
+                        time.sleep(12) 
                         
                     omg_req_url = f"{omg_base_url.rstrip('/')}/images/generations"
                     omg_head = {"Authorization": f"Bearer {omg_key}", "Content-Type": "application/json"}
@@ -641,20 +640,15 @@ Article Content:
                     }
                     
                     for attempt in range(4):
-                        try:
-                            # 增加 timeout 防止幽灵连接导致并发超标
-                            omg_resp = requests.post(omg_req_url, json=omg_data, headers=omg_head, timeout=90)
-                            if omg_resp.status_code == 200:
-                                img_url = omg_resp.json()['data'][0]['url']
-                                img_bytes = requests.get(img_url, timeout=60).content
-                                break
-                            elif omg_resp.status_code == 429:
-                                # 万一触发限流，强制长效休眠 30 秒
-                                time.sleep(30)
-                            else:
-                                time.sleep(10)
-                        except Exception as req_e:
-                            time.sleep(10)
+                        omg_resp = requests.post(omg_req_url, json=omg_data, headers=omg_head)
+                        if omg_resp.status_code == 200:
+                            img_url = omg_resp.json()['data'][0]['url']
+                            img_bytes = requests.get(img_url).content
+                            break
+                        elif omg_resp.status_code == 429:
+                            time.sleep(15)
+                        else:
+                            time.sleep(5)
                     else:
                         raise Exception(f"OhMyGPT API 请求失败: {omg_resp.text}")
 
@@ -902,8 +896,8 @@ Article to process:
 # 工具 7：全自动批量发布工具 (OhMyGPT 中转版)
 # ==========================================
 def tool7_batch_publish():
-    st.title("🤖 工具 7：全自动批量发布与排期 (深度冷却防封版)")
-    st.markdown("**🔥 终极效率工具**：内置顶级画质引擎、强制 25 秒防并发休眠、隐身模式一应俱全。")
+    st.title("🤖 工具 7：全自动批量发布与排期 (OhMyGPT DALL-E 3版)")
+    st.markdown("**🔥 终极效率工具**：调用 DALL-E 3 顶级画质引擎，强制 25 秒防并发休眠。")
     st.divider()
 
     col1, col2 = st.columns([1, 1])
@@ -919,17 +913,18 @@ def tool7_batch_publish():
         w_pass = st.text_input("WP 应用密码", type="password", value=get_config("WP_APP_PASSWORD") or "", key="w_pass_7")
         
         img_source = st.selectbox("选择自动配图的渠道：", [
-            "1. OhMyGPT (强烈推荐：FLUX顶级画质，支持支付宝充值)", 
+            "1. OhMyGPT (强烈推荐：DALL-E 3 顶级画质，支持支付宝充值)", 
             "2. Cloudflare AI (免费白嫖，但画质稍弱)", 
             "3. Pollinations.ai (免费免Key)"
         ], index=0, key="img_src_7")
         
-        omg_base_url_7, omg_key_7, omg_model_7 = "", "", "flux-schnell"
+        omg_base_url_7, omg_key_7, omg_model_7 = "", "", "dall-e-3"
         if "OhMyGPT" in img_source:
             col_omg1, col_omg2, col_omg3 = st.columns(3)
             with col_omg1: omg_base_url_7 = st.text_input("OhMyGPT 接口地址", value="https://api.ohmygpt.com/v1", key="t7_omg_url")
             with col_omg2: omg_key_7 = st.text_input("OhMyGPT API Key", type="password", key="t7_omg_key")
-            with col_omg3: omg_model_7 = st.text_input("模型名称", value="flux-schnell", key="t7_omg_model")
+            # 💡 核心修改：默认模型名改为 dall-e-3
+            with col_omg3: omg_model_7 = st.text_input("模型名称", value="dall-e-3", key="t7_omg_model")
         
         st.markdown("---")
         start_date = st.date_input("排期开始日期", value=datetime.today(), key="t7_date")
@@ -1083,7 +1078,7 @@ LOOP END
                 # ==================================
                 # 步骤 C1: 提取 AI 提示词并精密画图
                 # ==================================
-                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🎨 提取提示词并调用 FLUX 生成配图...")
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🎨 提取提示词并调用 DALL-E 3 生成配图...")
                 log_box.code("\n".join(logs[-5:]))
                 
                 img_prompt_req = f"""
@@ -1125,7 +1120,6 @@ Article Content:
                     
                     try:
                         if "OhMyGPT" in img_source:
-                            # 💡 核心防御：强制深度休眠 25 秒，绝对避免 OhMyGPT 的并发超限
                             if i > 0:
                                 logs.append(f"  └ 正在深度冷却 25 秒，绝对避免并发限速...")
                                 log_box.code("\n".join(logs[-5:]))
@@ -1142,7 +1136,6 @@ Article Content:
                             
                             for attempt in range(4):
                                 try:
-                                    # 增加 timeout 防止幽灵连接导致并发超标
                                     omg_resp = requests.post(omg_req_url, json=omg_data, headers=omg_head, timeout=90)
                                     if omg_resp.status_code == 200:
                                         img_url = omg_resp.json()['data'][0]['url']
@@ -1411,7 +1404,7 @@ Article to process:
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: 2026 深度冷却版")
+    st.caption("版本: OhMyGPT DALL-E 3 满血版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", "2. 文章话题生成器", "3. 写文章原材料",
         "4. 文章生成器", "5. 文章配图 + 一键发布", "7. 批量发布工具 ⭐"
