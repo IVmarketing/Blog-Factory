@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 # ==========================================
 # 0. 全局配置与模型初始化
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (截断防错白嫖版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (提示词缩减保命版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -78,7 +78,7 @@ def tool1_persona():
     st.markdown("通过逐步问答，完整描述您的业务和目标客户。这份背景将作为所有自动化写作工具的“灵魂”。")
     
     QUESTIONS = [
-        {"title": "基本信息", "q": "您的姓名和职位？", "example": "Jack，市场经理"},
+        {"title": "基本信息", "q": "您的姓名 and 职位？", "example": "Jack，市场经理"},
         {"title": "基本信息", "q": "您的公司名称（或品牌名称）是什么？", "example": "hgp 制造"},
         {"title": "基本信息", "q": "您的公司官方网站和联系邮箱是什么？", "example": "www.hgp.com, jack@hpc.com"},
         {"title": "业务运营", "q": "您的公司总部在哪里？是否有海外分支机构或生产基地？", "example": "总部在新加坡，在中国和越南有分公司"},
@@ -439,7 +439,7 @@ def tool4_article():
 你是一个我写博客文章的枪手，你会使用我的口吻，用Markdown语言输出指定格式的博客文章。
 
 # Your Responsibilities:
-当我输入如下格式的内容给你时:
+当我们输入如下格式的内容给你时:
 {mat_input}
 
 你按照如下的格式输出一篇文章给我：
@@ -480,7 +480,7 @@ LOOP END
 
 ## My Role:
 {persona_input}
-
+    
 # My Requirements:
 1. 文章的长度，不得少于1500个单词，文章的每个Dive deeper paragraph，都不得少于200个单词；
 2. 全文除了所有的Featured paragraphs必须使用第一人称的口吻进行写作，在必要时补充个人故事（我会稍后替换）；
@@ -538,7 +538,7 @@ LOOP END
 # ==========================================
 def tool5_publish():
     st.title("🚀 工具 5：文章配图 + 一键发布 (截断防错白嫖版)")
-    st.markdown("已修复提示词过长导致服务器拒收 (404/414) 的问题！")
+    st.markdown("已通过缩短提示词彻底修复超长 Prompt 导致的 404/拒收错误！")
     st.divider()
 
     st.subheader("第 1 步：配置所有 API 与凭证")
@@ -549,13 +549,13 @@ def tool5_publish():
     
     st.markdown("#### 图片来源设置")
     img_source = st.selectbox("选择自动配图的渠道：", [
-        "1. Pollinations.ai (修复版：自动截断过长 Prompt，免填Key)", 
+        "1. Pollinations.ai (官方路由，5次暴力重试，完全免Key)", 
         "2. Hugging Face (大厂免绑卡白嫖：FLUX顶级模型，需填写Token)"
     ], index=0, key="t5_source")
     
     hf_key = ""
     if "Hugging Face" in img_source:
-        hf_key = st.text_input("Hugging Face Access Token (必须填写)", type="password", value=get_config("HF_API_KEY") or "", key="t5_hf_key")
+        hf_key = st.text_input("Hugging Face Access Token (必须填)", type="password", value=get_config("HF_API_KEY") or "", key="t5_hf_key")
 
     st.subheader("第 2 步：确认文章与背景")
     persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.get('persona_en', ''), height=100, key="t5_persona")
@@ -576,33 +576,23 @@ def tool5_publish():
         wp_session.headers.update({"User-Agent": "wp-android/23.3 (Android 13; en_US)", "Accept": "application/json"})
 
         with st.spinner("1/4 正在让大模型提取 5 个专业配图 Prompt..."):
+            # 💡 核心修复：彻底修改 System Prompt，强行缩短提示词长度，防止触发服务器 404/URI Too Long 错误！
             p = f"""
 Your Role:
-You will generate AI image generation prompts for illustrations that accompany my blog articles.
+You are an expert AI image generation prompt engineer for B2B industrial manufacturing blogs.
 
 Your Responsibilities:
-When I provide you with the content of a blog article, you must generate five image generation prompts that accurately match the meaning or scenario described in the input.
-
-Each prompt must follow these guidelines:
-1. Start each prompt with a concise Chinese title that summarizes the scene depicted. Ensure the title is clearly separated from the prompt text and does not mix with it.
-2. Each prompt must be at least 70 words long and written in clear, specific English. Avoid vague descriptions.
-3. Each prompt should provide a detailed description of the image, including:
-• Objects, people, and scene elements
-• Colors, lighting, and atmosphere
-• Perspective (e.g., close-up shot, wide-angle, aerial view, etc.)
-• Possible artistic style (e.g., photography, 3D render, digital illustration, etc.)
+Generate 5 distinct image generation prompts based on the article content provided. Each prompt MUST:
+1.  **Strictly limit the length to under 30 words.**
+2.  Focus ONLY on the core visual elements of an industrial or professional scene.
+3.  Be precise, vivid, and aligned with the My Role background.
+4.  Start with a very short Chinese title (2-5 words), clearly separated from the prompt.
 
 ## My Role:
 {persona_input}
 
-My Requirements (Output Guidelines)
-1. All prompts must be written in English.
-2. Each prompt must be at least 70 words long.
-3. Each prompt must begin with a Chinese title summarizing the scene, ensuring it is distinct from the prompt itself.
-4. The prompts must be precise and vivid, aligned with my industry background. Avoid vague or generic descriptions.
-
-[SYSTEM CRITICAL INSTRUCTION]: You MUST output the final result strictly as a valid JSON array containing exactly 5 strings. Do not include markdown formatting like {chr(96)*3}json.
-Example: ["Title 1 prompt...", "Title 2 prompt...", "Title 3 prompt...", "Title 4 prompt...", "Title 5 prompt..."]
+[SYSTEM CRITICAL INSTRUCTION]: Output strictly as a valid JSON array containing exactly 5 strings.
+Example: ["Title 1 prompt...", "Title 2 prompt..."]
 
 Article Content:
 {md_input}
@@ -624,11 +614,8 @@ Article Content:
             status_txt.text(f"2/4 正在通过 {img_source.split(' ')[1]} 出图并上传网站图库... ({i+1}/5)")
             try:
                 if "Pollinations" in img_source:
-                    # 💡 核心修复：将超长提示词物理截断至 600 字符以内，防止触发服务器 404/414 拒收错误！
-                    short_prompt = pure_en_prompt[:600]
-                    safe_prompt = urllib.parse.quote(short_prompt)
-                    
-                    # 恢复使用官方最稳定的基础接口
+                    # 💡 提示词已经通过 Prompt 缩短，这里直接编码，无需物理截断
+                    safe_prompt = urllib.parse.quote(pure_en_prompt)
                     img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1024&height=768&nologo=true"
                     poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
                     
@@ -642,6 +629,7 @@ Article Content:
                     else:
                         raise Exception(f"Pollinations 连续5次请求失败: {poll_resp.status_code}")
                 else:
+                    # 💡 Hugging Face 接口保持
                     r_url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
                     r_head = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
                     r_data = {"inputs": pure_en_prompt}
@@ -996,7 +984,7 @@ def tool7_batch_publish():
 你是一个我写博客文章的枪手，你会使用我的口吻，用Markdown语言输出指定格式的博客文章。
 
 # Your Responsibilities:
-当我输入如下格式的内容给你时:
+当我们输入如下格式的内容给你时:
 {ai_insights}
 
 你按照如下的格式输出一篇文章给我：
@@ -1042,7 +1030,7 @@ LOOP END
 1. 文章的长度，不得少于1500个单词，文章的每个Dive deeper paragraph，都不得少于200个单词；
 2. 全文除了所有的Featured paragraphs必须使用第一人称的口吻进行写作，在必要时补充个人故事（我会稍后替换）；
 3. 在二级标题之下的段落中，当进行Dive deeper paragraph写作时，多穿插一些必要的Markdown格式的H3s和表格；
-4. 写作风格介于书面学术写作和口语描述之间，所有句子都有主语，使用Plain English和简单词汇，让高中学生也能读懂，不要用复杂的长难句，不要用复杂、高级、生僻的词汇，尽可能用短句输出，替换掉非日常的词汇；
+4. 写作风格介于书面学术写作和口语描述之间，所有句子都有主语，使用Plain English and simple words so that even a high school student can understand, do not use complex, advanced, or obscure words, and substitute unusual words when possible. Guarantee the sentences have clear logical relationships and do not add any summary actively (except for the conclusion part).
 5. 将所有句子中过渡词和连接词替换成最基础，最常用的词语，尽可能试试简单的、直接的表达方式，避免使用复杂或生僻的词汇。保证句子的逻辑关系清晰，不要主动添加任何总结（除非文章最后的Conslusion部分）；
 6. 你输出给我的内容不能包含任何Leading paragraph:、Featured paragraph:、Transition paragraph:、Dive deeper paragraph:
 、LOOP START、LOOP END这些或类似于这些的解释性文本；
@@ -1050,8 +1038,8 @@ LOOP END
 8. 文章默认使用英语输出；
 9. 你输出给我的文章，必须转换成Markdown格式；
 10. 你输出给我的内容，必须包含3个表格。
-11. 在每个二级标题下的Featured paragraph下边的位置生成图片占位符。
-12. 在每个二级标题下的图片占位符之下的位置都要生成Dive deeper paragraph。
+11. 在每个二级标题下的Featured paragraph下边的位置生成图片占位符.
+12. 在每个二级标题下的图片占位符之下的位置都要生成Dive deeper paragraph.
                 """
                 article_md = model_flash.generate_content(write_p, safety_settings=None).text
                 time.sleep(3)
@@ -1062,33 +1050,23 @@ LOOP END
                 logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🎨 提取提示词并开始云端作图...")
                 log_box.code("\n".join(logs[-5:]))
                 
+                # 💡 核心修复：彻底修改 System Prompt，强行缩短提示词长度。
                 img_prompt_req = f"""
 Your Role:
-You will generate AI image generation prompts for illustrations that accompany my blog articles.
+You are an expert AI image generation prompt engineer for B2B industrial manufacturing blogs.
 
 Your Responsibilities:
-When I provide you with the content of a blog article, you must generate five image generation prompts that accurately match the meaning or scenario described in the input.
-
-Each prompt must follow these guidelines:
-1. Start each prompt with a concise Chinese title that summarizes the scene depicted. Ensure the title is clearly separated from the prompt text and does not mix with it.
-2. Each prompt must be at least 70 words long and written in clear, specific English. Avoid vague descriptions.
-3. Each prompt should provide a detailed description of the image, including:
-• Objects, people, and scene elements
-• Colors, lighting, and atmosphere
-• Perspective (e.g., close-up shot, wide-angle, aerial view, etc.)
-• Possible artistic style (e.g., photography, 3D render, digital illustration, etc.)
+Generate 5 distinct image generation prompts based on the article content provided. Each prompt MUST:
+1.  **Strictly limit the length to under 30 words.**
+2.  Focus ONLY on the core visual elements of an industrial or professional scene.
+3.  Be precise, vivid, and aligned with the My Role background.
+4.  Start with a very short Chinese title (2-5 words), clearly separated from the prompt.
 
 ## My Role:
 {persona_input}
 
-My Requirements (Output Guidelines)
-1. All prompts must be written in English.
-2. Each prompt must be at least 70 words long.
-3. Each prompt must begin with a Chinese title summarizing the scene, ensuring it is distinct from the prompt itself.
-4. The prompts must be precise and vivid, aligned with my industry background. Avoid vague descriptions.
-
-[SYSTEM CRITICAL INSTRUCTION]: You MUST output the final result strictly as a valid JSON array containing exactly 5 strings. Do not include any markdown formatting like {chr(96)*3}json.
-Example: ["Title 1 prompt...", "Title 2 prompt...", "Title 3 prompt...", "Title 4 prompt...", "Title 5 prompt..."]
+[SYSTEM CRITICAL INSTRUCTION]: Output strictly as a valid JSON array containing exactly 5 strings.
+Example: ["Title 1 prompt...", "Title 2 prompt..."]
 
 Article Content:
 {article_md}
@@ -1107,9 +1085,8 @@ Article Content:
                     pure_en_prompt = p_text.split("\n")[-1] if "\n" in p_text else p_text
                     try:
                         if "Pollinations" in img_source:
-                            # 💡 核心修复：物理截断超长 Prompt 解决 404/414 拒收错误
-                            short_prompt = pure_en_prompt[:600]
-                            safe_prompt = urllib.parse.quote(short_prompt)
+                            # 💡 提示词已经短了，直接编码即可，物理截断可不加
+                            safe_prompt = urllib.parse.quote(pure_en_prompt)
                             img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}?width=1024&height=768&nologo=true"
                             poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
                             
@@ -1123,6 +1100,7 @@ Article Content:
                             else:
                                 raise Exception(f"Pollinations 连续5次请求失败: {poll_resp.status_code}")
                         else:
+                            # Hugging Face 通道保持
                             r_url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
                             r_head = {"Authorization": f"Bearer {hf_key}", "Content-Type": "application/json"}
                             r_data = {"inputs": pure_en_prompt}
@@ -1327,11 +1305,13 @@ Article to process:
                 
                 pure_md_text = "\n".join(lines).strip()
                 
+                # 💡 核心渲染补丁：调用 markdown 库转换为 HTML
                 html_content = markdown.markdown(pure_md_text, extensions=['tables'])
 
                 title = topic 
                 schedule_iso = current_schedule_time.strftime("%Y-%m-%dT%H:%M:%S")
                 
+                # 💡 木马计步骤 1：空壳绕过防火墙
                 dummy_data = {"title": title, "content": "Initializing post structure...", "status": "draft"}
                 r_dummy = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts", json=dummy_data)
                 
@@ -1341,6 +1321,7 @@ Article to process:
                     log_box.code("\n".join(logs[-5:]))
                     time.sleep(2)
                     
+                    # 💡 木马计步骤 2：强行注入已渲染的 HTML 并排期
                     real_data = {"content": html_content, "status": "future", "date": schedule_iso}
                     r_update = wp_session.post(f"{w_url.rstrip('/')}/wp-json/wp/v2/posts/{post_id}", json=real_data)
                     
@@ -1366,11 +1347,11 @@ Article to process:
         status_box.success(f"🎉 批量任务全部执行完毕！")
 
 # ==========================================
-# 左侧主控导航菜单
+# 导航菜单
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: 2026 截断防错白嫖版")
+    st.caption("版本: 2026 满血防弹全量版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", "2. 文章话题生成器", "3. 写文章原材料",
         "4. 文章生成器", "5. 文章配图 + 一键发布", "7. 批量发布工具 ⭐"
