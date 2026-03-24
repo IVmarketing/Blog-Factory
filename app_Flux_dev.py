@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 # ==========================================
 # 0. 全局配置与模型初始化
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (OhMyGPT 智能限速版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (OhMyGPT 深度冷却版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -538,8 +538,8 @@ LOOP END
 # 工具 5：文章配图 + 一键发布 (OhMyGPT 中转版)
 # ==========================================
 def tool5_publish():
-    st.title("🚀 工具 5：文章配图 + 一键发布 (OhMyGPT 满血画质版)")
-    st.markdown("已接入 OhMyGPT 接口，内置智能限速机制避免触发 429 频率限制！")
+    st.title("🚀 工具 5：文章配图 + 一键发布 (OhMyGPT 深度冷却版)")
+    st.markdown("已接入 OhMyGPT 接口，内置深度冷却休眠机制避免触发并发与频率限制！")
     st.divider()
 
     st.subheader("第 1 步：配置所有 API 与凭证")
@@ -626,9 +626,10 @@ Article Content:
             status_txt.text(f"2/4 正在通过 {img_source.split(' ')[1]} 出图并缓慢上传防拦截... ({i+1}/5)")
             try:
                 if "OhMyGPT" in img_source:
-                    # 💡 核心修复：每次请求前主动休眠，完美避开 OhMyGPT 的 10 秒/次 并发限制
-                    if i > 0: 
-                        time.sleep(12) 
+                    # 💡 核心防御：强制深度休眠 25 秒，杜绝并发越界
+                    if i > 0:
+                        status_txt.text(f"2/4 正在出图... 深度冷却 25 秒防限速 ({i+1}/5)")
+                        time.sleep(25) 
                         
                     omg_req_url = f"{omg_base_url.rstrip('/')}/images/generations"
                     omg_head = {"Authorization": f"Bearer {omg_key}", "Content-Type": "application/json"}
@@ -640,16 +641,20 @@ Article Content:
                     }
                     
                     for attempt in range(4):
-                        omg_resp = requests.post(omg_req_url, json=omg_data, headers=omg_head)
-                        if omg_resp.status_code == 200:
-                            img_url = omg_resp.json()['data'][0]['url']
-                            img_bytes = requests.get(img_url).content
-                            break
-                        elif omg_resp.status_code == 429:
-                            # 如果万一触发限流，强制休眠 15 秒后再试，绝不崩溃
-                            time.sleep(15)
-                        else:
-                            time.sleep(5)
+                        try:
+                            # 增加 timeout 防止幽灵连接导致并发超标
+                            omg_resp = requests.post(omg_req_url, json=omg_data, headers=omg_head, timeout=90)
+                            if omg_resp.status_code == 200:
+                                img_url = omg_resp.json()['data'][0]['url']
+                                img_bytes = requests.get(img_url, timeout=60).content
+                                break
+                            elif omg_resp.status_code == 429:
+                                # 万一触发限流，强制长效休眠 30 秒
+                                time.sleep(30)
+                            else:
+                                time.sleep(10)
+                        except Exception as req_e:
+                            time.sleep(10)
                     else:
                         raise Exception(f"OhMyGPT API 请求失败: {omg_resp.text}")
 
@@ -897,8 +902,8 @@ Article to process:
 # 工具 7：全自动批量发布工具 (OhMyGPT 中转版)
 # ==========================================
 def tool7_batch_publish():
-    st.title("🤖 工具 7：全自动批量发布与排期 (智能限速防封版)")
-    st.markdown("**🔥 终极效率工具**：内置顶级画质引擎、智能避开频率限制（429）、隐身模式一应俱全。")
+    st.title("🤖 工具 7：全自动批量发布与排期 (深度冷却防封版)")
+    st.markdown("**🔥 终极效率工具**：内置顶级画质引擎、强制 25 秒防并发休眠、隐身模式一应俱全。")
     st.divider()
 
     col1, col2 = st.columns([1, 1])
@@ -1099,7 +1104,7 @@ Rules for Ultimate Precision Geometry:
 {persona_input}
 
 [SYSTEM CRITICAL INSTRUCTION]: Output strictly as a valid JSON array containing exactly 5 strings. Do not include any markdown formatting.
-Example: ["Title 1 prompt...", "Title 2 prompt..."]
+Example: ["A wide angle shot of a hydraulic motor...", "Close up of steel gears..."]
 
 Article Content:
 {article_md}
@@ -1120,11 +1125,11 @@ Article Content:
                     
                     try:
                         if "OhMyGPT" in img_source:
-                            # 💡 核心防御：强制休眠 12 秒，完美避开 429 报错
+                            # 💡 核心防御：强制深度休眠 25 秒，绝对避免 OhMyGPT 的并发超限
                             if i > 0:
-                                logs.append(f"  └ 正在冷却 12 秒，避免触发 OhMyGPT 频率限制...")
+                                logs.append(f"  └ 正在深度冷却 25 秒，绝对避免并发限速...")
                                 log_box.code("\n".join(logs[-5:]))
-                                time.sleep(12)
+                                time.sleep(25)
                                 
                             omg_req_url = f"{omg_base_url_7.rstrip('/')}/images/generations"
                             omg_head = {"Authorization": f"Bearer {omg_key_7}", "Content-Type": "application/json"}
@@ -1136,17 +1141,21 @@ Article Content:
                             }
                             
                             for attempt in range(4):
-                                omg_resp = requests.post(omg_req_url, json=omg_data, headers=omg_head)
-                                if omg_resp.status_code == 200:
-                                    img_url = omg_resp.json()['data'][0]['url']
-                                    img_bytes = requests.get(img_url).content
-                                    break
-                                elif omg_resp.status_code == 429:
-                                    logs.append(f"  └ 触发限流，强制再休眠 15 秒...")
-                                    log_box.code("\n".join(logs[-5:]))
-                                    time.sleep(15)
-                                else:
-                                    time.sleep(5)
+                                try:
+                                    # 增加 timeout 防止幽灵连接导致并发超标
+                                    omg_resp = requests.post(omg_req_url, json=omg_data, headers=omg_head, timeout=90)
+                                    if omg_resp.status_code == 200:
+                                        img_url = omg_resp.json()['data'][0]['url']
+                                        img_bytes = requests.get(img_url, timeout=60).content
+                                        break
+                                    elif omg_resp.status_code == 429:
+                                        logs.append(f"  └ 触发限流，强制长效休眠 30 秒...")
+                                        log_box.code("\n".join(logs[-5:]))
+                                        time.sleep(30)
+                                    else:
+                                        time.sleep(10)
+                                except Exception as req_e:
+                                    time.sleep(10)
                             else:
                                 raise Exception(f"OhMyGPT API 请求失败: {omg_resp.text}")
 
@@ -1402,7 +1411,7 @@ Article to process:
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: 2026 智能限速版")
+    st.caption("版本: 2026 深度冷却版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", "2. 文章话题生成器", "3. 写文章原材料",
         "4. 文章生成器", "5. 文章配图 + 一键发布", "7. 批量发布工具 ⭐"
