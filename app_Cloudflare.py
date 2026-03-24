@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 # ==========================================
 # 0. 全局配置与模型初始化
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (Cloudflare 企业级大厂版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (Cloudflare 终极精密工程版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -251,7 +251,7 @@ def tool2_topics():
                         for ct in t_list:
                             curr += 1
                             with st.spinner(f"[{curr}/{total_combo}] 正在生成: {tc} × {ct}..."):
-                                prompt = f"角色：外贸SEO专家。我的国家：{current_val}。产品：{st.session_state.t2_product}。目标市场：{tc}。目标客户：{ct}。请生成 {per_combo} 个精准英文文章话题（标题）。直接输出列表，不带编号。"
+                                prompt = f"角色：外贸SEO专家。我的国家：{current_val}。产品：{st.session_state.t2_product}. 目标市场：{tc}。目标客户：{ct}。请生成 {per_combo} 个精准英文文章话题（标题）。直接输出列表，不带编号。"
                                 try:
                                     if curr > 1: time.sleep(1.5) 
                                     res = model_flash.generate_content(prompt, safety_settings=safe_config)
@@ -317,7 +317,7 @@ def tool3_materials():
 
 要求： 
 1. 你要基于 Google SERP 排名前 10 的自然搜索页面，提炼出 6 条明确提到的关键见解。 
-2. 再补充 4 条不在前 10 页中出现，但基于其他可靠信息或逻辑推理得出的见解。 
+2. 再补充 4 条不在前 10 页中出现，但基于可靠信息或逻辑推理得出的见解。 
 3. 总共输出 10 条见解。 
 4. 只输出见解内容，不要提到数据来源、研究过程，也不要写解释性文字。 
 5. 输出必须是英文，每条见解简洁、事实化。
@@ -440,7 +440,7 @@ def tool4_article():
 你是一个我写博客文章的枪手，你会使用我的口吻，用Markdown语言输出指定格式的博客文章。
 
 # Your Responsibilities:
-当我输入如下格式的内容给你时:
+当我们输入如下格式的内容给你时:
 {mat_input}
 
 你按照如下的格式输出一篇文章给我：
@@ -535,11 +535,11 @@ LOOP END
             st.markdown(st.session_state.t4_article_draft, unsafe_allow_html=True)
 
 # ==========================================
-# 工具 5：文章配图 + 一键发布 (Cloudflare 企业满血版)
+# 工具 5：文章配图 + 一键发布 (Cloudflare 精密工程版)
 # ==========================================
 def tool5_publish():
-    st.title("🚀 工具 5：文章配图 + 一键发布 (大厂极速防弹版)")
-    st.markdown("已接入 Cloudflare 企业级 AI 引擎，彻底告别 404/500 宕机报错！")
+    st.title("🚀 工具 5：文章配图 + 一键发布 (精密工程防弹版)")
+    st.markdown("已接入加强版“精密工程提示语”引擎，彻底修复工业模型细节模糊扭曲问题！")
     st.divider()
 
     st.subheader("第 1 步：配置所有 API 与凭证")
@@ -550,17 +550,17 @@ def tool5_publish():
     
     st.markdown("#### 图片来源设置")
     img_source = st.selectbox("选择自动配图的渠道：", [
-        "1. Cloudflare AI (强烈推荐：每天免费1万积分，永不宕机，需API配置)", 
-        "2. Pollinations.ai (纯净URL+5次重试，完全免填Key)"
+        "1. Cloudflare AI (强烈推荐：每天免费1万积分，极速防弹)", 
+        "2. Pollinations.ai (纯净URL+5次重试，免填Key)"
     ], index=0, key="t5_source")
     
     cf_id = ""
     cf_token = ""
     if "Cloudflare" in img_source:
-        col_cf1, col_cf2 = st.columns(2)
-        with col_cf1: cf_id = st.text_input("Cloudflare Account ID (必填)", type="password", value=get_config("CF_ACCOUNT_ID") or "", key="t5_cf_id")
-        with col_cf2: cf_token = st.text_input("Cloudflare API Token (必填)", type="password", value=get_config("CF_API_TOKEN") or "", key="t5_cf_token")
-        st.info("💡 Cloudflare 账号免费注册，每天赠送的神经元额度足够生成上百张顶级 B2B 工业配图。")
+        ccol1, ccol2 = st.columns(2)
+        with ccol1: cf_id = st.text_input("Cloudflare Account ID (必填)", type="password", value=get_config("CF_ACCOUNT_ID") or "", key="t5_cf_id")
+        with ccol2: cf_token = st.text_input("Cloudflare API Token (必填)", type="password", value=get_config("CF_API_TOKEN") or "", key="t5_cf_token")
+        st.info("💡 Cloudflare 每天赠送的神经元额度足够生成上百张顶级 B2B 工业配图。")
 
     st.subheader("第 2 步：确认文章与背景")
     persona_input = st.text_area("角色背景 (用于配图基调)：", value=st.session_state.get('persona_en', ''), height=100, key="t5_persona")
@@ -580,22 +580,26 @@ def tool5_publish():
         wp_session.auth = HTTPBasicAuth(w_user, w_pass)
         wp_session.headers.update({"User-Agent": "wp-android/23.3 (Android 13; en_US)", "Accept": "application/json"})
 
-        with st.spinner("1/4 正在让大模型提取 5 个专业配图 Prompt..."):
+        with st.spinner("1/4 正在通过加固引擎提取 5 个专业精密配图 Prompt..."):
+            # 💡 核心修复：终极精密工程提示语生成逻辑
             p = f"""
 Your Role:
-You are an expert AI image generation prompt engineer for B2B industrial manufacturing blogs.
+You are an expert AI image generation prompt engineer specializing in high-fidelity, precision-engineered industrial product catalog photography for B2B blogs.
 
 Your Responsibilities:
-Generate 5 distinct image generation prompts based on the article content provided. Each prompt MUST:
-1.  **Strictly limit the length to under 30 words.**
-2.  Focus ONLY on the core visual elements of an industrial or professional scene.
-3.  Be precise, vivid, and aligned with the My Role background.
-4.  **MUST BE 100% PURE ENGLISH.** Do NOT include any Chinese titles, prefixes, or explanations.
+Generate 5 distinct, highly realistic image generation prompts based on the article content provided. For the model to produce crisp, precise mechanical details, your prompts MUST provide extreme guidance. Follow these rules without exception.
+
+Rules for Ultimate Precision Geometry:
+1.  **Limit length to under 30 words.** Be direct and precise.
+2.  **Explicitly Force Precision:** You MUST include keywords like: "precision engineered," "perfect geometry," "accurate assembly," "flawless surfaces," "sharply defined edges," "flawless mechanical parts," "blueprint-like accuracy," and "no distortion."
+3.  **Command "Product Catalog Photography" Look:** You MUST include keywords like: "high-resolution studio photography," "macro product shot," "crisp, sharp focus on every detail," "deep focus (f/8 aperture)," "flawless studio lighting," and "clean background."
+4.  **Specify materials for realism:** "machined metal textures," "highly polished surfaces," "reflective steel," "perfectly-formed water droplets."
+5.  **100% PURE ENGLISH.** Do NOT include any Chinese titles, prefixes, or explanations.
 
 ## My Role:
 {persona_input}
 
-[SYSTEM CRITICAL INSTRUCTION]: Output strictly as a valid JSON array containing exactly 5 strings.
+[SYSTEM CRITICAL INSTRUCTION]: You MUST output the final result strictly as a valid JSON array containing exactly 5 strings. Do not include any markdown formatting like {chr(96)*3}json.
 Example: ["A wide angle shot of a hydraulic motor...", "Close up of steel gears..."]
 
 Article Content:
@@ -614,14 +618,14 @@ Article Content:
         status_txt = st.empty()
 
         for i, p_text in enumerate(prompts):
-            # 终极正则清洗：仅保留安全字符
+            # 终极正则清洗
             pure_en_prompt = re.sub(r'[^a-zA-Z0-9\s,\.\-]', '', p_text).strip()
             pure_en_prompt = " ".join(pure_en_prompt.split())
             
-            status_txt.text(f"2/4 正在通过 {img_source.split(' ')[1]} 出图并上传网站图库... ({i+1}/5)")
+            status_txt.text(f"2/4 正在通过 Cloudflare 企业通道极速出图并上传... ({i+1}/5)")
             try:
                 if "Cloudflare" in img_source:
-                    # 💡 核心接入：Cloudflare Workers AI (稳定如铁)
+                    # 💡 接入点：Cloudflare Workers AI
                     cf_url = f"https://api.cloudflare.com/client/v4/accounts/{cf_id}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
                     cf_head = {"Authorization": f"Bearer {cf_token}"}
                     cf_data = {"prompt": pure_en_prompt}
@@ -639,7 +643,7 @@ Article Content:
                 elif "Pollinations" in img_source:
                     safe_prompt = urllib.parse.quote(pure_en_prompt)
                     img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}"
-                    poll_head = {"User-Agent": "Mozilla/5.0"}
+                    poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
                     poll_params = {"width": 1024, "height": 768, "nologo": "true"}
                     
                     for attempt in range(5):
@@ -667,7 +671,7 @@ Article Content:
                 wp_urls.append(f"https://placehold.co/800x400.png?text=Image+Upload+Error") 
             progress_bar.progress((i + 1) / 5)
         
-        status_txt.success("✅ 5 张图片已成功生成并上传到 WordPress 媒体库！")
+        status_txt.success("✅ 5 张精密工程配图已成功生成并上传到 WordPress！")
 
         with st.spinner("3/4 正在将网站真实图片链接注入文章，并生成 SEO Alt 标签..."):
             seo_p = f"""
@@ -808,7 +812,7 @@ Article to process:
             """
             st.session_state.t5_final_markdown = model_flash.generate_content(fn_prompt, safety_settings=None).text
 
-        st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
+        st.success("🎉 全套自动化处理完毕！您现在拥有了一篇带精密真实图片、完美 SEO 和脚注的终极 Markdown 文章。")
 
     # UI 渲染部分
     if st.session_state.get('t5_final_markdown') or st.session_state.get('t5_seo_markdown'):
@@ -873,11 +877,11 @@ Article to process:
                 except Exception as e: st.error(f"网络报错: {e}")
 
 # ==========================================
-# 工具 7：全自动批量发布工具 (Cloudflare 企业满血版)
+# 工具 7：全自动批量发布工具 (精密工程满血版)
 # ==========================================
 def tool7_batch_publish():
-    st.title("🤖 工具 7：全自动批量发布与排期 (企业大厂引擎版)")
-    st.markdown("**🔥 终极效率工具**：全自动执行调研、长文、极速生图、WP图库上传、图片 SEO 与双向脚注系统。")
+    st.title("🤖 工具 7：全自动批量发布与排期 (精密工程大厂版)")
+    st.markdown("**🔥 终极效率工具**：全自动执行调研、长文、精密画图、WP图库上传、图片 SEO 与双向脚注系统。")
     st.divider()
 
     col1, col2 = st.columns([1, 1])
@@ -893,8 +897,8 @@ def tool7_batch_publish():
         w_pass = st.text_input("WP 应用密码", type="password", value=get_config("WP_APP_PASSWORD") or "", key="w_pass_7")
         
         img_source = st.selectbox("选择自动配图的渠道：", [
-            "1. Cloudflare AI (强烈推荐：每天免费1万积分，极速防弹)", 
-            "2. Pollinations.ai (纯净URL+5次重试，免填Key)"
+            "1. Cloudflare AI (强烈推荐：每天免费1万积分，永不宕机，需API配置)", 
+            "2. Pollinations.ai (纯净URL+5次重试，完全免填Key)"
         ], index=0, key="img_src_7")
         
         cf_id_7 = ""
@@ -993,7 +997,7 @@ def tool7_batch_publish():
 你是一个我写博客文章的枪手，你会使用我的口吻，用Markdown语言输出指定格式的博客文章。
 
 # Your Responsibilities:
-当我输入如下格式的内容给你时:
+当我们输入如下格式的内容给你时:
 {ai_insights}
 
 你按照如下的格式输出一篇文章给我：
@@ -1054,27 +1058,31 @@ LOOP END
                 time.sleep(3)
                 
                 # ==================================
-                # 步骤 C1: 提取 AI 提示词并画图
+                # 步骤 C1: 提取 AI 提示词并精密画图
                 # ==================================
-                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🎨 提取提示词并开始云端作图...")
+                logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] 🎨 提取提示词并生成精密工程配图...")
                 log_box.code("\n".join(logs[-5:]))
                 
+                # 💡 核心修复：批量发布中的精密工程提示语生成逻辑
                 img_prompt_req = f"""
 Your Role:
-You are an expert AI image generation prompt engineer for B2B industrial manufacturing blogs.
+You are an expert AI image generation prompt engineer specializing in high-fidelity, precision-engineered industrial product catalog photography for B2B blogs.
 
 Your Responsibilities:
-Generate 5 distinct image generation prompts based on the article content provided. Each prompt MUST:
-1.  **Strictly limit the length to under 30 words.**
-2.  Focus ONLY on the core visual elements of an industrial or professional scene.
-3.  Be precise, vivid, and aligned with the My Role background.
-4.  **MUST BE 100% PURE ENGLISH.** Do NOT include any Chinese titles, prefixes, or explanations.
+Generate 5 distinct, highly realistic image generation prompts based on the article content provided. For the model to produce crisp, precise mechanical details, your prompts MUST provide extreme guidance. Follow these rules without exception.
+
+Rules for Ultimate Precision Geometry:
+1.  **Limit length to under 30 words.** Be direct and precise.
+2.  **Explicitly Force Precision:** You MUST include keywords like: "precision engineered," "perfect geometry," "accurate assembly," "flawless surfaces," "sharply defined edges," "flawless mechanical parts," "blueprint-like accuracy," and "no distortion."
+3.  **Command "Product Catalog Photography" Look:** You MUST include keywords like: "high-resolution studio photography," "macro product shot," "crisp, sharp focus on every detail," "deep focus (f/8 aperture)," "flawless studio lighting," and "clean background."
+4.  **Specify materials for realism:** "machined metal textures," "highly polished surfaces," "reflective steel," "perfectly-formed water droplets."
+5.  **100% PURE ENGLISH.** Do NOT include any Chinese titles, prefixes, or explanations.
 
 ## My Role:
 {persona_input}
 
-[SYSTEM CRITICAL INSTRUCTION]: Output strictly as a valid JSON array containing exactly 5 strings. Do not include any markdown formatting like {chr(96)*3}json.
-Example: ["A wide angle shot of a hydraulic motor...", "Close up of steel gears..."]
+[SYSTEM CRITICAL INSTRUCTION]: Output strictly as a valid JSON array containing exactly 5 strings. Do not include any markdown formatting.
+Example: ["Title 1 prompt...", "Title 2 prompt..."]
 
 Article Content:
 {article_md}
@@ -1090,6 +1098,7 @@ Article Content:
 
                 wp_urls = []
                 for i, p_text in enumerate(img_prompts_list[:5]): 
+                    # 正则清洗
                     pure_en_prompt = re.sub(r'[^a-zA-Z0-9\s,\.\-]', '', p_text).strip()
                     pure_en_prompt = " ".join(pure_en_prompt.split())
                     
@@ -1352,11 +1361,11 @@ Article to process:
         status_box.success(f"🎉 批量任务全部执行完毕！")
 
 # ==========================================
-# 左侧主控导航菜单
+# 导航菜单
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: 2026 Cloudflare 满血版")
+    st.caption("版本: 2026 精密工程版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", "2. 文章话题生成器", "3. 写文章原材料",
         "4. 文章生成器", "5. 文章配图 + 一键发布", "7. 批量发布工具 ⭐"
