@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 # ==========================================
 # 0. 全局配置与模型初始化
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (FLUX 满血终极版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (全量满血不偷懒版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -71,7 +71,7 @@ def init_session_state():
 
 init_session_state()
 
-# 💡 核心外挂：万能 JSON 网址提取器（用于解析 OhMyGPT 专属接口返回的奇葩数据）
+# 💡 核心外挂：万能 JSON 网址提取器
 def find_url_in_json(obj):
     if isinstance(obj, str) and obj.startswith("http") and not obj.endswith(".cn") and not obj.endswith(".com"):
         return obj
@@ -549,11 +549,11 @@ LOOP END
             st.markdown(st.session_state.t4_article_draft, unsafe_allow_html=True)
 
 # ==========================================
-# 工具 5：文章配图 + 一键发布 (OhMyGPT 专属通道版)
+# 工具 5：文章配图 + 一键发布 (全功能直连版)
 # ==========================================
 def tool5_publish():
-    st.title("🚀 工具 5：文章配图 + 一键发布 (FLUX 满血专属版)")
-    st.markdown("已接入 OhMyGPT 专属免费通道，并伪装为官方安卓客户端绕过防火墙。")
+    st.title("🚀 工具 5：文章配图 + 一键发布 (单篇全量版)")
+    st.markdown("已同步搭载最新 OhMyGPT 专属接口通道与防弹伪装技术！")
     st.divider()
 
     st.subheader("第 1 步：配置所有 API 与凭证")
@@ -581,7 +581,7 @@ def tool5_publish():
 
     st.subheader("第 3 步：全自动化处理 (AI配图 → WP上传 → SEO替换 → 脚注)")
     
-    if st.button("🌟 一键执行：全自动配图与深度优化", type="primary", use_container_width=True, key="btn_t5_exec"):
+    if st.button("🌟 一键执行单篇发布", type="primary", use_container_width=True, key="btn_t5_exec"):
         if not all([w_url, w_user, w_pass, md_input]):
             st.error("⚠️ 请填写完整的 WP凭证和文章内容！")
             return
@@ -644,7 +644,7 @@ Article Content:
                     base_domain = omg_base_url.replace('/v1', '').rstrip('/')
                     if "flux" in omg_model.lower():
                         omg_req_url = f"{base_domain}/api/v1/ai/draw/flux/schnell"
-                        omg_data = {"prompt": pure_en_prompt}
+                        omg_data = {"model": omg_model, "prompt": pure_en_prompt, "n": 1, "size": "1024x1024"}
                     else:
                         omg_req_url = f"{base_domain}/v1/images/generations"
                         omg_data = {"model": omg_model, "prompt": pure_en_prompt, "n": 1, "size": "1024x1024"}
@@ -675,8 +675,8 @@ Article Content:
                 elif "Pollinations" in img_source:
                     safe_prompt = urllib.parse.quote(pure_en_prompt)
                     img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}"
-                    poll_head = {"User-Agent": "Mozilla/5.0"}
-                    poll_params = {"width": 1024, "height": 1024, "nologo": "true"}
+                    poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                    poll_params = {"width": 1024, "height": 1024}
                     
                     for attempt in range(5):
                         poll_resp = requests.get(img_url, headers=poll_head, params=poll_params, timeout=45)
@@ -913,7 +913,7 @@ Article to process:
                 except Exception as e: st.error(f"网络报错: {e}")
 
 # ==========================================
-# 工具 7：全自动批量发布工具
+# 工具 7：全自动批量发布工具 
 # ==========================================
 def tool7_batch_publish():
     st.title("🤖 工具 7：全自动批量发布与排期 (FLUX 专属满血版)")
@@ -1143,12 +1143,17 @@ Article Content:
                                 log_box.code("\n".join(logs[-5:]))
                                 time.sleep(15)
                                 
-                            # 💡 终极直连：根据官网截图解析的免费 FLUX 专属通道！
+                            # 💡 终极修复：带有完整参数的 FLUX 专属直达车！
                             base_domain = omg_base_url_7.replace('/v1', '').rstrip('/')
                             
                             if "flux" in omg_model_7.lower():
                                 omg_req_url = f"{base_domain}/api/v1/ai/draw/flux/schnell"
-                                omg_data = {"prompt": pure_en_prompt}
+                                omg_data = {
+                                    "model": omg_model_7, # 👈 补回这致命的计费名字
+                                    "prompt": pure_en_prompt,
+                                    "n": 1,
+                                    "size": "1024x1024"
+                                }
                             else:
                                 omg_req_url = f"{base_domain}/v1/images/generations"
                                 omg_data = {"model": omg_model_7, "prompt": pure_en_prompt, "n": 1, "size": "1024x1024"}
@@ -1159,7 +1164,6 @@ Article Content:
                                 try:
                                     omg_resp = requests.post(omg_req_url, json=omg_data, headers=omg_head, timeout=90)
                                     if omg_resp.status_code == 200:
-                                        # 💡 万能 JSON 网址提取器
                                         resp_json = omg_resp.json()
                                         img_url = find_url_in_json(resp_json)
                                         
@@ -1181,10 +1185,11 @@ Article Content:
                                 raise Exception(f"OhMyGPT 专属接口失败: {omg_resp.text}")
 
                         elif "Pollinations" in img_source:
+                            # 💡 同步修复 Pollinations 的 401 拦截
                             safe_prompt = urllib.parse.quote(pure_en_prompt)
                             img_url = f"https://image.pollinations.ai/prompt/{safe_prompt}"
-                            poll_head = {"User-Agent": "Mozilla/5.0"}
-                            poll_params = {"width": 1024, "height": 1024, "nologo": "true"}
+                            poll_head = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                            poll_params = {"width": 1024, "height": 1024} # 移除了可能触发收费锁的 nologo
                             
                             for attempt in range(5):
                                 poll_resp = requests.get(img_url, headers=poll_head, params=poll_params, timeout=45)
@@ -1432,7 +1437,7 @@ Article to process:
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: FLUX 满血终极版")
+    st.caption("版本: FLUX 满血直连版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", "2. 文章话题生成器", "3. 写文章原材料",
         "4. 文章生成器", "5. 文章配图 + 一键发布", "7. 批量发布工具 ⭐"
