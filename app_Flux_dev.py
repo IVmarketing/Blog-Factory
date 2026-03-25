@@ -599,26 +599,26 @@ def tool5_publish():
         with st.spinner("1/4 正在让大模型提取 5 个专业配图 Prompt..."):
             p = f"""
 Your Role:
-You are an expert AI image generation prompt engineer specializing in high-fidelity, precision-engineered industrial product catalog photography for B2B blogs.
+You are an expert AI image generation prompt engineer and industrial visual director. Your goal is to generate 5 highly realistic, visually diverse photographic prompts for the FLUX.1 model, perfectly matched to the specific narrative of a B2B industrial blog article.
 
 Your Responsibilities:
-Generate 5 distinct, highly realistic image generation prompts based on the article content provided. For the model to produce crisp, precise mechanical details, your prompts MUST provide extreme guidance. Follow these rules without exception.
+Read the provided article sequentially. For each major section/concept, generate ONE image prompt that perfectly illustrates the specific message of THAT paragraph. 
 
-Rules for Ultimate Precision Geometry:
-1.  **Limit length to under 30 words.** Be direct and precise.
-2.  **Explicitly Force Precision:** You MUST include keywords like: "precision engineered," "perfect geometry," "accurate assembly," "flawless surfaces," "sharply defined edges," "flawless mechanical parts," "blueprint-like accuracy," and "no distortion."
-3.  **Command "Product Catalog Photography" Look:** You MUST include keywords like: "high-resolution studio photography," "macro product shot," "crisp, sharp focus on every detail," "deep focus (f/8 aperture)," "flawless studio lighting," and "clean background."
-4.  **Specify materials for realism:** "machined metal textures," "highly polished surfaces," "reflective steel," "perfectly-formed water droplets."
-5.  **100% PURE ENGLISH.** Do NOT include any Chinese titles, prefixes, or explanations.
+Rules for Dynamic, Context-Aware Industrial Photography:
+1. Context is King: The image MUST visually translate the specific paragraph's topic (e.g., if the section is about "Supply Chain", show a bustling shipping port or warehouse; if it's about "Precision QC", show a laser scanning lab or engineer inspecting a machined gear).
+2. Forbid Boring Repetition: DO NOT generate 5 plain-background product catalog shots. You must intelligently vary the visual perspectives based on the text: mix extreme close-ups, wide industrial landscapes, human engineers at work, harsh real-world applications (mud, salt spray), and high-tech lab testing.
+3. FLUX Prompt Style: Use dense, comma-separated keywords detailing the subject, action, environment, lighting, and camera angle. (e.g., "Medium shot, skilled engineer inspecting hydraulic orbit motor, busy factory floor in background, depth of field, warm industrial lighting, photorealistic, 8k, highly detailed").
+4. Length: 40 to 80 words per prompt.
+5. PURE ENGLISH. No titles, no bullet points, no prefixes like "Prompt 1:". Just the raw descriptive text.
 
-## My Role:
+## My Role / Corporate Background:
 {persona_input}
 
-[SYSTEM CRITICAL INSTRUCTION]: You MUST output the final result strictly as a valid JSON array containing exactly 5 strings. Do not include any markdown formatting like {chr(96)*3}json.
-Example: ["A wide angle shot of a hydraulic motor...", "Close up of steel gears..."]
+[SYSTEM CRITICAL INSTRUCTION]: Output strictly as a valid JSON array containing exactly 5 strings. Do NOT include any Markdown formatting like ```json.
+Example: ["Extreme close up of a machined steel gerotor gear, laser measuring tool, precision engineering lab...", "Wide shot of an offshore oil rig in a stormy sea, heavy hydraulic cranes..."]
 
 Article Content:
-{md_input}
+{article_md}
             """
             try:
                 res = model_flash.generate_content(p, safety_settings=None, generation_config={"response_mime_type": "application/json"}).text
