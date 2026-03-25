@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 # ==========================================
 # 0. 全局配置与模型初始化
 # ==========================================
-st.set_page_config(page_title="AI Writer 工业化中心 (FLUX 满血直连版)", layout="wide")
+st.set_page_config(page_title="AI Writer 工业化中心 (FLUX 满血终极版)", layout="wide")
 
 def get_config(key): return st.secrets.get(key) or os.getenv(key)
 api_key = get_config("GEMINI_API_KEY")
@@ -70,6 +70,20 @@ def init_session_state():
     if 't5_final_markdown' not in st.session_state: st.session_state.t5_final_markdown = ""
 
 init_session_state()
+
+# 💡 核心外挂：万能 JSON 网址提取器（用于解析 OhMyGPT 专属接口返回的奇葩数据）
+def find_url_in_json(obj):
+    if isinstance(obj, str) and obj.startswith("http") and not obj.endswith(".cn") and not obj.endswith(".com"):
+        return obj
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            res = find_url_in_json(v)
+            if res: return res
+    if isinstance(obj, list):
+        for item in obj:
+            res = find_url_in_json(item)
+            if res: return res
+    return None
 
 # ==========================================
 # 工具 1：创建【我的角色背景】
@@ -535,11 +549,11 @@ LOOP END
             st.markdown(st.session_state.t4_article_draft, unsafe_allow_html=True)
 
 # ==========================================
-# 工具 5：文章配图 + 一键发布 
+# 工具 5：文章配图 + 一键发布 (OhMyGPT 专属通道版)
 # ==========================================
 def tool5_publish():
-    st.title("🚀 工具 5：文章配图 + 一键发布 (FLUX 满血版)")
-    st.markdown("强制调用聊天接口，完美绕过模型白名单，成功唤醒 FLUX！")
+    st.title("🚀 工具 5：文章配图 + 一键发布 (FLUX 满血专属版)")
+    st.markdown("已接入 OhMyGPT 专属免费通道，并伪装为官方安卓客户端绕过防火墙。")
     st.divider()
 
     st.subheader("第 1 步：配置所有 API 与凭证")
@@ -551,8 +565,7 @@ def tool5_publish():
     st.markdown("#### 图片来源设置")
     img_source = st.selectbox("选择自动配图的渠道：", [
         "1. OhMyGPT (强烈推荐：FLUX顶级画质，支持支付宝充值)", 
-        "2. Cloudflare AI (免费白嫖，但画质稍弱)", 
-        "3. Pollinations.ai (免费免Key)"
+        "2. Pollinations.ai (免费免Key)"
     ], index=0, key="t5_source")
     
     omg_base_url, omg_key, omg_model = "", "", "flux-schnell"
@@ -560,7 +573,6 @@ def tool5_publish():
         col_omg1, col_omg2, col_omg3 = st.columns(3)
         with col_omg1: omg_base_url = st.text_input("OhMyGPT 接口地址", value="https://api.ohmygpt.com/v1", key="t5_omg_url")
         with col_omg2: omg_key = st.text_input("OhMyGPT API Key", type="password", key="t5_omg_key")
-        # 恢复默认 FLUX
         with col_omg3: omg_model = st.text_input("模型名称", value="flux-schnell", key="t5_omg_model")
 
     st.subheader("第 2 步：确认文章与背景")
@@ -624,35 +636,33 @@ Article Content:
             pure_en_prompt = re.sub(r'[^a-zA-Z0-9\s,\.\-]', '', p_text).strip()
             pure_en_prompt = " ".join(pure_en_prompt.split())
             
-            status_txt.text(f"2/4 正在通过 {img_source.split(' ')[1]} 伪装聊天通道出图... ({i+1}/5)")
+            status_txt.text(f"2/4 正在出图并缓慢上传防拦截... ({i+1}/5)")
             try:
                 if "OhMyGPT" in img_source:
                     if i > 0: time.sleep(15) 
                     
-                    # 💡 终极破解：走 /chat/completions 接口，假装聊天要图片 URL
-                    omg_req_url = f"{omg_base_url.rstrip('/')}/chat/completions"
+                    base_domain = omg_base_url.replace('/v1', '').rstrip('/')
+                    if "flux" in omg_model.lower():
+                        omg_req_url = f"{base_domain}/api/v1/ai/draw/flux/schnell"
+                        omg_data = {"prompt": pure_en_prompt}
+                    else:
+                        omg_req_url = f"{base_domain}/v1/images/generations"
+                        omg_data = {"model": omg_model, "prompt": pure_en_prompt, "n": 1, "size": "1024x1024"}
+                        
                     omg_head = {"Authorization": f"Bearer {omg_key}", "Content-Type": "application/json"}
-                    
-                    omg_data = {
-                        "model": omg_model,
-                        "messages": [
-                            {"role": "system", "content": "You are an image generation AI. Output ONLY the markdown image link of the generated image."},
-                            {"role": "user", "content": pure_en_prompt}
-                        ]
-                    }
                     
                     for attempt in range(4):
                         try:
                             omg_resp = requests.post(omg_req_url, json=omg_data, headers=omg_head, timeout=90)
                             if omg_resp.status_code == 200:
-                                reply_content = omg_resp.json()['choices'][0]['message']['content']
-                                url_match = re.search(r'(https?://[^\s\>\"\'\)]+)', reply_content)
-                                if url_match:
-                                    img_url = url_match.group(1)
+                                resp_json = omg_resp.json()
+                                img_url = find_url_in_json(resp_json)
+                                
+                                if img_url:
                                     img_bytes = requests.get(img_url, timeout=60).content
                                     break
                                 else:
-                                    raise Exception(f"AI 未返回图片网址，而是返回了: {reply_content}")
+                                    raise Exception(f"未找到图片网址: {omg_resp.text}")
                             elif omg_resp.status_code == 429:
                                 time.sleep(15)
                             else:
@@ -660,7 +670,7 @@ Article Content:
                         except Exception as req_e:
                             time.sleep(10)
                     else:
-                        raise Exception(f"OhMyGPT 聊天接口请求失败: {omg_resp.text}")
+                        raise Exception(f"OhMyGPT 接口请求失败: {omg_resp.text}")
 
                 elif "Pollinations" in img_source:
                     safe_prompt = urllib.parse.quote(pure_en_prompt)
@@ -903,11 +913,11 @@ Article to process:
                 except Exception as e: st.error(f"网络报错: {e}")
 
 # ==========================================
-# 工具 7：全自动批量发布工具 
+# 工具 7：全自动批量发布工具
 # ==========================================
 def tool7_batch_publish():
-    st.title("🤖 工具 7：全自动批量发布与排期 (FLUX 直连满血版)")
-    st.markdown("**🔥 终极效率工具**：强制走聊天接口完美召唤 FLUX，同时具备 WP 安全伪装！")
+    st.title("🤖 工具 7：全自动批量发布与排期 (FLUX 专属满血版)")
+    st.markdown("**🔥 终极杀招**：原生专属画图直连 + 官方 WP APP 防火墙伪装，彻底击碎一切拦截！")
     st.divider()
 
     col1, col2 = st.columns([1, 1])
@@ -924,8 +934,7 @@ def tool7_batch_publish():
         
         img_source = st.selectbox("选择自动配图的渠道：", [
             "1. OhMyGPT (强烈推荐：FLUX顶级画质，支持支付宝充值)", 
-            "2. Cloudflare AI (免费白嫖，但画质稍弱)", 
-            "3. Pollinations.ai (免费免Key)"
+            "2. Pollinations.ai (免费免Key)"
         ], index=0, key="img_src_7")
         
         omg_base_url_7, omg_key_7, omg_model_7 = "", "", "flux-schnell"
@@ -933,7 +942,6 @@ def tool7_batch_publish():
             col_omg1, col_omg2, col_omg3 = st.columns(3)
             with col_omg1: omg_base_url_7 = st.text_input("OhMyGPT 接口地址", value="https://api.ohmygpt.com/v1", key="t7_omg_url")
             with col_omg2: omg_key_7 = st.text_input("OhMyGPT API Key", type="password", key="t7_omg_key")
-            # 恢复默认 FLUX
             with col_omg3: omg_model_7 = st.text_input("模型名称", value="flux-schnell", key="t7_omg_model")
         
         st.markdown("---")
@@ -1131,44 +1139,46 @@ Article Content:
                     try:
                         if "OhMyGPT" in img_source:
                             if i > 0:
-                                logs.append(f"  └ 正在深度冷却 25 秒，绝对避免并发限速...")
+                                logs.append(f"  └ 正在冷却 15 秒，避免并发限速...")
                                 log_box.code("\n".join(logs[-5:]))
-                                time.sleep(25)
+                                time.sleep(15)
                                 
-                            # 💡 终极破解：走 /chat/completions 接口！
-                            omg_req_url = f"{omg_base_url_7.rstrip('/')}/chat/completions"
-                            omg_head = {"Authorization": f"Bearer {omg_key_7}", "Content-Type": "application/json"}
+                            # 💡 终极直连：根据官网截图解析的免费 FLUX 专属通道！
+                            base_domain = omg_base_url_7.replace('/v1', '').rstrip('/')
                             
-                            omg_data = {
-                                "model": omg_model_7,
-                                "messages": [
-                                    {"role": "system", "content": "You are an image generation AI. Output ONLY the markdown image link of the generated image."},
-                                    {"role": "user", "content": pure_en_prompt}
-                                ]
-                            }
+                            if "flux" in omg_model_7.lower():
+                                omg_req_url = f"{base_domain}/api/v1/ai/draw/flux/schnell"
+                                omg_data = {"prompt": pure_en_prompt}
+                            else:
+                                omg_req_url = f"{base_domain}/v1/images/generations"
+                                omg_data = {"model": omg_model_7, "prompt": pure_en_prompt, "n": 1, "size": "1024x1024"}
+                                
+                            omg_head = {"Authorization": f"Bearer {omg_key_7}", "Content-Type": "application/json"}
                             
                             for attempt in range(4):
                                 try:
                                     omg_resp = requests.post(omg_req_url, json=omg_data, headers=omg_head, timeout=90)
                                     if omg_resp.status_code == 200:
-                                        reply_content = omg_resp.json()['choices'][0]['message']['content']
-                                        url_match = re.search(r'(https?://[^\s\>\"\'\)]+)', reply_content)
-                                        if url_match:
-                                            img_url = url_match.group(1)
+                                        # 💡 万能 JSON 网址提取器
+                                        resp_json = omg_resp.json()
+                                        img_url = find_url_in_json(resp_json)
+                                        
+                                        if img_url:
                                             img_bytes = requests.get(img_url, timeout=60).content
                                             break
                                         else:
-                                            raise Exception(f"AI 未返回图片网址，而是返回了: {reply_content}")
+                                            raise Exception(f"请求成功，但没找到图片网址: {omg_resp.text}")
+                                            
                                     elif omg_resp.status_code == 429:
-                                        logs.append(f"  └ 触发限流，强制长效休眠 30 秒...")
+                                        logs.append(f"  └ 触发限流，强制休眠 15 秒...")
                                         log_box.code("\n".join(logs[-5:]))
-                                        time.sleep(30)
+                                        time.sleep(15)
                                     else:
-                                        time.sleep(10)
+                                        time.sleep(5)
                                 except Exception as req_e:
                                     time.sleep(10)
                             else:
-                                raise Exception(f"OhMyGPT 聊天接口请求失败: {omg_resp.text}")
+                                raise Exception(f"OhMyGPT 专属接口失败: {omg_resp.text}")
 
                         elif "Pollinations" in img_source:
                             safe_prompt = urllib.parse.quote(pure_en_prompt)
@@ -1422,7 +1432,7 @@ Article to process:
 # ==========================================
 with st.sidebar:
     st.title("⚙️ AI Writer 工业化中心")
-    st.caption("版本: FLUX 直连满血版")
+    st.caption("版本: FLUX 满血终极版")
     page = st.radio("系统功能导航", [
         "1. 创建角色背景", "2. 文章话题生成器", "3. 写文章原材料",
         "4. 文章生成器", "5. 文章配图 + 一键发布", "7. 批量发布工具 ⭐"
